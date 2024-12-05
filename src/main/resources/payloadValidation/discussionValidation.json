@@ -13,10 +13,19 @@
       "type": "string"
     },
     "tags": {
-      "type": "string"
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "targetTopic": {
       "type": "string"
+    },
+    "media": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "required": [

@@ -15,13 +15,22 @@
     "description": {
       "type": "string"
     },
-    "tag": {
-      "type": "string"
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "targetTopic": {
       "type": "string"
     },
     "answerPosts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "media": {
       "type": "array",
       "items": {
         "type": "string"

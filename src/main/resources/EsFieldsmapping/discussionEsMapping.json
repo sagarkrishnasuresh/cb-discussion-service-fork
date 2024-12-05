@@ -6,13 +6,16 @@
     "type": "keyword"
   },
   "title": {
-    "type": "text"
+    "type": "keyword"
   },
   "description": {
-    "type": "text"
+    "type": "keyword"
   },
   "tags": {
     "type": "keyword"
+  },
+  "createdBy": {
+  "type": "keyword"
   },
   "isActive": {
     "type": "boolean"
@@ -36,5 +39,11 @@
       "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
       "epoch_millis"
     ]
+  },
+  "answerPosts": {
+    "type": "keyword"
+  },
+  "media": {
+    "type": "keyword"
   }
 }
