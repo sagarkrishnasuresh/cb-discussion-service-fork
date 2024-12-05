@@ -14,6 +14,9 @@
   "tags": {
     "type": "keyword"
   },
+  "createdBy": {
+  "type": "keyword"
+  },
   "isActive": {
     "type": "boolean"
   },
@@ -36,5 +39,8 @@
       "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
       "epoch_millis"
     ]
+  },
+  "mediaUrls": {
+    "type": "keyword"
   }
 }

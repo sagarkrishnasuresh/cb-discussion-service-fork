@@ -76,6 +76,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         try {
             ((ObjectNode) discussionDetails).put(Constants.CREATED_BY, userId);
             ((ObjectNode) discussionDetails).put(Constants.VOTE_COUNT,0);
+            ((ObjectNode) discussionDetails).put(Constants.MEDIA,discussionDetails.get(Constants.MEDIA));
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
@@ -92,10 +93,9 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.addDocument(Constants.DISCUSSION_INDEX, Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache("discussion_" + String.valueOf(id), jsonNode);
             map.put(Constants.CREATED_ON,currentTime);
-            map.put(Constants.DISCUSSION_ID,String.valueOf(id));
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
@@ -209,7 +209,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNode.setAll((ObjectNode) data);
 
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.addDocument(Constants.DISCUSSION_INDEX, Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             Map<String, Object> responseMap = objectMapper.convertValue(discussionDbData, new TypeReference<Map<String, Object>>() {
             });
             response.setResponseCode(HttpStatus.OK);
@@ -241,7 +241,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
         try {
-            searchResult = esUtilService.searchDocuments(Constants.DISCUSSION_INDEX, searchCriteria);
+            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
             redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
             createSuccessResponse(response);
@@ -288,7 +288,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         discussionRepository.save(jasonEntity);
                         Map<String, Object> map = objectMapper.convertValue(data, Map.class);
                         map.put(Constants.IS_ACTIVE, false);
-                        esUtilService.addDocument(Constants.DISCUSSION_INDEX, Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+                        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
                         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, data);
                         log.info("Discussion details deleted successfully");
                         response.setResponseCode(HttpStatus.OK);
@@ -401,7 +401,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             JsonNode jsonNode = objectMapper.valueToTree(discussionData);
             discussionDbData.setData(jsonNode);
             discussionRepository.save(discussionDbData);
-            esUtilService.addDocument(Constants.DISCUSSION_INDEX, Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), discussionData, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), discussionData, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), discussionData);
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);

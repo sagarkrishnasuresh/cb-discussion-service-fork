@@ -67,7 +67,6 @@ public class Constants {
     public static final String UNKNOWN_IDENTIFIER = "Unknown identifier ";
     public static final String EXCEPTION_MSG_UPDATE = "Exception occurred while updating record to ";
     public static final String DISCUSSION_VALIDATION_FILE = "/payloadValidation/discussionValidation.json";
-    public static final String DISCUSSION_INDEX = "discussion_entity";
     public static final String FAILED_TO_CREATE_DISCUSSION = "Failed to create the discussion";
     public static final String SEARCH_RESULTS = "search_results";
     public static final String DISCUSSION_ID = "discussionId";
@@ -109,6 +108,7 @@ public class Constants {
     public static final String FAILED_CONST = "FAILED";
     public static final String X_AUTH_TOKEN = "x-authenticated-user-token";
     public static final String UPDATED_ON = "updatedOn";
+    public static final String MEDIA = "mediaUrls";
 
     private Constants() {
     }
