@@ -21,7 +21,7 @@
     "targetTopic": {
       "type": "string"
     },
-    "media": {
+    "mediaUrls": {
       "type": "array",
       "items": {
         "type": "string"

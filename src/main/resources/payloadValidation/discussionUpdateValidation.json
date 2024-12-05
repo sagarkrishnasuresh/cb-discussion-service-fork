@@ -24,13 +24,7 @@
     "targetTopic": {
       "type": "string"
     },
-    "answerPosts": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "media": {
+    "mediaUrls": {
       "type": "array",
       "items": {
         "type": "string"

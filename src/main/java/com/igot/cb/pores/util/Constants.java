@@ -108,7 +108,7 @@ public class Constants {
     public static final String FAILED_CONST = "FAILED";
     public static final String X_AUTH_TOKEN = "x-authenticated-user-token";
     public static final String UPDATED_ON = "updatedOn";
-    public static final String MEDIA = "media";
+    public static final String MEDIA = "mediaUrls";
 
     private Constants() {
     }

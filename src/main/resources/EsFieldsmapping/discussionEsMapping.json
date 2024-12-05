@@ -40,10 +40,7 @@
       "epoch_millis"
     ]
   },
-  "answerPosts": {
-    "type": "keyword"
-  },
-  "media": {
+  "mediaUrls": {
     "type": "keyword"
   }
 }
