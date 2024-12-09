@@ -245,14 +245,14 @@ public class DiscussionServiceImpl implements DiscussionService {
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
             List<Map<String, Object>> discussions = objectMapper.convertValue(
                     searchResult.getData(),
-                    new TypeReference<List<Map<String, Object>>>() {}
+                    new TypeReference<List<Map<String, Object>>>() {
+                    }
             );
 
             Map<String, String> discussionToCreatedByMap = discussions.stream()
                     .collect(Collectors.toMap(
                             discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
-                            discussion -> discussion.get(Constants.CREATED_BY).toString()
-                    ));
+                            discussion -> discussion.get(Constants.CREATED_BY).toString()));
 
             Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
 
@@ -263,8 +263,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                     .map(user -> (Map<String, Object>) user)
                     .collect(Collectors.toMap(
                             user -> user.get("user_id").toString(),
-                            user -> user
-                    ));
+                            user -> user));
 
             List<String> missingUserIds = createdByIds.stream()
                     .filter(id -> !userDetailsMap.containsKey(id))
@@ -276,8 +275,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         .map(user -> (Map<String, Object>) user)
                         .collect(Collectors.toMap(
                                 user -> user.get("user_id").toString(),
-                                user -> user
-                        )));
+                                user -> user)));
             }
 
             for (Map<String, Object> discussion : discussions) {
@@ -291,8 +289,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             JsonNode enhancedData = objectMapper.valueToTree(discussions);
             searchResult.setData(enhancedData);
 
-            redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(),
-                    TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
 
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
             createSuccessResponse(response);
