@@ -248,22 +248,56 @@ public class DiscussionServiceImpl implements DiscussionService {
                     new TypeReference<List<Map<String, Object>>>() {}
             );
 
-            for (Map<String, Object> map : discussions) {
-                List<Object> userDetails = fetchDataForKeys(
-                        Collections.singletonList(Constants.USER_PREFIX + map.get(Constants.CREATED_BY).toString())
-                );
-                if (userDetails == null || userDetails.isEmpty()) {
-                    userDetails = fetchUserFromprimary(Collections.singletonList(map.get(Constants.CREATED_BY).toString()));
-                }
+            Map<String, String> discussionToCreatedByMap = discussions.stream()
+                    .collect(Collectors.toMap(
+                            discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
+                            discussion -> discussion.get(Constants.CREATED_BY).toString()
+                    ));
 
-                map.put(Constants.CREATED_BY, userDetails.get(0));
+            Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
+
+            List<Object> redisResults = fetchDataForKeys(
+                    createdByIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
+            );
+            Map<String, Object> userDetailsMap = redisResults.stream()
+                    .map(user -> (Map<String, Object>) user)
+                    .collect(Collectors.toMap(
+                            user -> user.get("user_id").toString(),
+                            user -> user
+                    ));
+
+            List<String> missingUserIds = createdByIds.stream()
+                    .filter(id -> !userDetailsMap.containsKey(id))
+                    .collect(Collectors.toList());
+
+            if (!missingUserIds.isEmpty()) {
+                List<Object> cassandraResults = fetchUserFromprimary(missingUserIds);
+                userDetailsMap.putAll(cassandraResults.stream()
+                        .map(user -> (Map<String, Object>) user)
+                        .collect(Collectors.toMap(
+                                user -> user.get("user_id").toString(),
+                                user -> user
+                        )));
             }
+
+            for (Map<String, Object> discussion : discussions) {
+                String discussionId = discussion.get(Constants.DISCUSSION_ID).toString();
+                String createdById = discussionToCreatedByMap.get(discussionId);
+                if (createdById != null) {
+                    discussion.put(Constants.CREATED_BY, userDetailsMap.getOrDefault(createdById, Collections.emptyMap()));
+                }
+            }
+
             JsonNode enhancedData = objectMapper.valueToTree(discussions);
             searchResult.setData(enhancedData);
-            redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
+
+            redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(),
+                    TimeUnit.SECONDS);
+
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
             createSuccessResponse(response);
             return response;
+
         } catch (Exception e) {
             createErrorResponse(response, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED_CONST);
             redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
