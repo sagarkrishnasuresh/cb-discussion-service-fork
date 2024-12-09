@@ -538,10 +538,9 @@ public class DiscussionServiceImpl implements DiscussionService {
                                     userMap.put(Constants.DEPARTMENT, (String) ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY));
 
                                 }
-
                             }
                         } catch (JsonProcessingException e) {
-                            throw new RuntimeException(e);
+                            log.error("Error occurred while converting json object to json string", e);
                         }
                     }
 
