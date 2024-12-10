@@ -229,7 +229,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     public ApiResponse searchDiscussion(SearchCriteria searchCriteria) {
         log.info("DiscussionServiceImpl::searchDiscussion");
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
-        SearchResult searchResult = redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
+        SearchResult searchResult = new SearchResult();
         if (searchResult != null) {
             log.info("DiscussionServiceImpl::searchDiscussion:  search result fetched from redis");
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
@@ -262,7 +262,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> userDetailsMap = redisResults.stream()
                     .map(user -> (Map<String, Object>) user)
                     .collect(Collectors.toMap(
-                            user -> user.get("user_id").toString(),
+                            user -> user.get(Constants.USER_ID_KEY).toString(),
                             user -> user));
 
             List<String> missingUserIds = createdByIds.stream()
@@ -274,27 +274,26 @@ public class DiscussionServiceImpl implements DiscussionService {
                 userDetailsMap.putAll(cassandraResults.stream()
                         .map(user -> (Map<String, Object>) user)
                         .collect(Collectors.toMap(
-                                user -> user.get("user_id").toString(),
+                                user -> user.get(Constants.USER_ID_KEY).toString(),
                                 user -> user)));
             }
 
+            List<Map<String, Object>> filteredDiscussions = new ArrayList<>();
             for (Map<String, Object> discussion : discussions) {
                 String discussionId = discussion.get(Constants.DISCUSSION_ID).toString();
                 String createdById = discussionToCreatedByMap.get(discussionId);
-                if (createdById != null) {
-                    discussion.put(Constants.CREATED_BY, userDetailsMap.getOrDefault(createdById, Collections.emptyMap()));
+                if (createdById != null && userDetailsMap.containsKey(createdById)) {
+                    discussion.put(Constants.CREATED_BY, userDetailsMap.get(createdById));
+                    filteredDiscussions.add(discussion);
                 }
             }
 
-            JsonNode enhancedData = objectMapper.valueToTree(discussions);
+            JsonNode enhancedData = objectMapper.valueToTree(filteredDiscussions);
             searchResult.setData(enhancedData);
-
             redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
-
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
             createSuccessResponse(response);
             return response;
-
         } catch (Exception e) {
             createErrorResponse(response, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED_CONST);
             redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
