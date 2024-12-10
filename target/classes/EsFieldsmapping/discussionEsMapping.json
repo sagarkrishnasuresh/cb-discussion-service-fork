@@ -1,0 +1,46 @@
+{
+  "discussionId": {
+    "type": "keyword"
+  },
+  "type": {
+    "type": "keyword"
+  },
+  "title": {
+    "type": "text"
+  },
+  "description": {
+    "type": "text"
+  },
+  "tags": {
+    "type": "keyword"
+  },
+  "createdBy": {
+  "type": "keyword"
+  },
+  "isActive": {
+    "type": "boolean"
+  },
+  "targetTopic": {
+    "type": "keyword"
+  },
+  "voteCount": {
+    "type": "number"
+  },
+  "createdOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "updatedOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "mediaUrls": {
+    "type": "keyword"
+  }
+}
