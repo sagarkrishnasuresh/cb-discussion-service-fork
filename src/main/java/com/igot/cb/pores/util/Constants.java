@@ -109,6 +109,18 @@ public class Constants {
     public static final String X_AUTH_TOKEN = "x-authenticated-user-token";
     public static final String UPDATED_ON = "updatedOn";
     public static final String MEDIA = "mediaUrls";
+    public static final String USER_PREFIX = "user:" ;
+    public static final String USER_TABLE = "user";
+    public static final String PROFILE_DETAILS = "profiledetails";
+    public static final String FIRST_NAME = "firstname";
+    public static final String USER_ID_KEY = "user_id";
+    public static final String FIRST_NAME_KEY = "first_name";
+    public static final String PROFILE_IMG_KEY = "user_profile_img_url";
+    public static final String PROFILE_IMG = "profileImageUrl";
+    public static final String DESIGNATION_KEY = "designation";
+    public static final String EMPLOYMENT_DETAILS = "employmentDetails";
+    public static final String DEPARTMENT_KEY = "departmentName";
+    public static final String DEPARTMENT = "department";
 
     private Constants() {
     }
