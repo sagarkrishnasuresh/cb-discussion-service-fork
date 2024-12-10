@@ -229,7 +229,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     public ApiResponse searchDiscussion(SearchCriteria searchCriteria) {
         log.info("DiscussionServiceImpl::searchDiscussion");
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
-        SearchResult searchResult = new SearchResult();
+        SearchResult searchResult =  redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
         if (searchResult != null) {
             log.info("DiscussionServiceImpl::searchDiscussion:  search result fetched from redis");
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
@@ -270,7 +270,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                     .collect(Collectors.toList());
 
             if (!missingUserIds.isEmpty()) {
-                List<Object> cassandraResults = fetchUserFromprimary(missingUserIds);
+                List<Object> cassandraResults = fetchUserFromPrimary(missingUserIds);
                 userDetailsMap.putAll(cassandraResults.stream()
                         .map(user -> (Map<String, Object>) user)
                         .collect(Collectors.toMap(
@@ -526,7 +526,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 .collect(Collectors.toList());
     }
 
-    public List<Object> fetchUserFromprimary(List<String> userIds) {
+    public List<Object> fetchUserFromPrimary(List<String> userIds) {
         List<Object> userList = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
         propertyMap.put(Constants.ID, userIds);
