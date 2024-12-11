@@ -51,10 +51,17 @@ public class DiscussionController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @PostMapping("/upvote")
+    @PostMapping("/vote")
     public ResponseEntity<ApiResponse> updateUpVote(@RequestBody Map<String,Object> updateData,
                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
         ApiResponse response = discussionService.updateUpVote(updateData,token);
         return new ResponseEntity<>(response,response.getResponseCode());
+    }
+
+    @PostMapping("/answerPosts")
+    public ResponseEntity<ApiResponse> answerPost(@RequestBody JsonNode answerPostData,
+                                                  @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.createAnswerPost(answerPostData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
     }
 }

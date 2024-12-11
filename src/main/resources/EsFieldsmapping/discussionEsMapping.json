@@ -42,5 +42,11 @@
   },
   "mediaUrls": {
     "type": "keyword"
+  },
+  "answerPosts": {
+    "type": "keyword"
+  },
+  "answerPostCount": {
+    "type": "number"
   }
 }

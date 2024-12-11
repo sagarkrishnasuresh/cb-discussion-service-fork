@@ -135,7 +135,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 Optional<DiscussionEntity> entityOptional = discussionRepository.findById(discussionId);
                 if (entityOptional.isPresent()) {
                     DiscussionEntity discussionEntity = entityOptional.get();
-                    cacheService.putCache(discussionId, discussionEntity.getData());
+                    cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, discussionEntity.getData());
                     log.info("discussion Record coming from postgres db");
                     response.setMessage(Constants.SUCCESS);
                     response.setResponseCode(HttpStatus.OK);
@@ -185,19 +185,6 @@ public class DiscussionServiceImpl implements DiscussionService {
             for (String field : updateFields) {
                 if (updateData.has(field)) {
                     ((ObjectNode) data).put(field, updateData.get(field).asText());
-                }
-            }
-            if (updateData.has(Constants.ANSWER_POSTS)) {
-                String newAnswerPost = updateData.get(Constants.ANSWER_POSTS).get(0).asText();
-                if (!StringUtils.isBlank(newAnswerPost)) {
-                    Set<String> answerPostSet = new HashSet<>();
-                    if (data.has(Constants.ANSWER_POSTS)) {
-                        ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
-                        existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
-                    }
-                    answerPostSet.add(newAnswerPost);
-                    ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
-                    ((ObjectNode) data).set(Constants.ANSWER_POSTS, arrayNode);
                 }
             }
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
@@ -578,5 +565,100 @@ public class DiscussionServiceImpl implements DiscussionService {
                 })
                 .collect(Collectors.toList());
         return userList;
+    }
+
+    @Override
+    public ApiResponse createAnswerPost(JsonNode answerPostData, String token) {
+        log.info("DiscussionService::createAnswerPost:creating answerPost");
+        ApiResponse response = ProjectUtil.createDefaultResponse("discussion.createAnswerPost");
+        payloadValidation.validatePayload(Constants.DISCUSSION_ANSWER_POST_VALIDATION_FILE, answerPostData);
+        if (!validateDiscussionId(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText())) {
+            response.getParams().setErrMsg(Constants.INVALID_PARENT_DISCUSSION_ID);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return response;
+        }
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
+            response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return response;
+        }
+        try {
+            ((ObjectNode) answerPostData).put(Constants.CREATED_BY, userId);
+            ((ObjectNode) answerPostData).put(Constants.VOTE_COUNT, 0);
+            ((ObjectNode) answerPostData).put(Constants.MEDIA, answerPostData.get(Constants.MEDIA));
+            ((ObjectNode) answerPostData).put(Constants.PARENT_DISCUSSION_ID, answerPostData.get(Constants.PARENT_DISCUSSION_ID));
+            DiscussionEntity jsonNodeEntity = new DiscussionEntity();
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            UUID id = UUIDs.timeBased();
+            ((ObjectNode) answerPostData).put(Constants.DISCUSSION_ID, String.valueOf(id));
+            jsonNodeEntity.setDiscussionId(String.valueOf(id));
+            jsonNodeEntity.setCreatedOn(currentTime);
+            ((ObjectNode) answerPostData).put(Constants.CREATED_ON, currentTime.toString());
+            jsonNodeEntity.setIsActive(true);
+            ((ObjectNode) answerPostData).put(Constants.IS_ACTIVE, true);
+            jsonNodeEntity.setData(answerPostData);
+            DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
+            ObjectMapper objectMapper = new ObjectMapper();
+            ObjectNode jsonNode = objectMapper.createObjectNode();
+            jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
+            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
+            updateAnswerPostToDiscussion(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText());
+            log.info("AnswerPost created successfully");
+            map.put(Constants.CREATED_ON, currentTime);
+            response.setResponseCode(HttpStatus.CREATED);
+            response.getParams().setStatus(Constants.SUCCESS);
+            response.setResult(map);
+        } catch (Exception e) {
+            log.error("Failed to create AnswerPost: {}", e.getMessage(), e);
+            createErrorResponse(response, Constants.FAILED_TO_CREATE_ANSWER_POST, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
+            return response;
+        }
+        return response;
+    }
+
+    private boolean validateDiscussionId(String discussionId) {
+        DiscussionEntity discussionEntity = discussionRepository.findById(discussionId).orElse(null);
+        if (discussionEntity == null || !discussionEntity.getIsActive()) {
+            return false;
+        }
+        JsonNode data = discussionEntity.getData();
+        String type = data.get(Constants.TYPE).asText();
+        if (type.equals(Constants.ANSWER_POST)) {
+            return false;
+        }
+        return true;
+    }
+
+    private void updateAnswerPostToDiscussion(String discussionId) {
+        Optional<DiscussionEntity> entityOptional = discussionRepository.findById(discussionId);
+        DiscussionEntity discussionEntity = entityOptional.get();
+        JsonNode data = discussionEntity.getData();
+        if (data.has(Constants.ANSWER_POSTS)) {
+            Set<String> answerPostSet = new HashSet<>();
+            if (data.has(Constants.ANSWER_POSTS)) {
+                ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
+                existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
+            }
+            answerPostSet.add(discussionId);
+            ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
+            ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
+            ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, answerPostSet.size());
+        } else {
+            ArrayNode arrayNode = objectMapper.createArrayNode();
+            arrayNode.add(discussionId);
+            ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
+            ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, 1);
+        }
+        discussionEntity.setData(data);
+        DiscussionEntity saveJsonEntity = discussionRepository.save(discussionEntity);
+        log.info("DiscussionService::updateAnswerPostToDiscussion:discussionEntity updated");
+        ObjectNode jsonNode = objectMapper.createObjectNode();
+        jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
+        Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(discussionId), map, cbServerProperties.getElasticDiscussionJsonPath());
+        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
     }
 }
