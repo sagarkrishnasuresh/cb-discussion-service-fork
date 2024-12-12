@@ -23,7 +23,10 @@
   "targetTopic": {
     "type": "keyword"
   },
-  "voteCount": {
+  "upVoteCount": {
+    "type": "number"
+  },
+  "downVoteCount": {
     "type": "number"
   },
   "createdOn": {
@@ -42,5 +45,11 @@
   },
   "mediaUrls": {
     "type": "keyword"
+  },
+  "answerPosts": {
+    "type": "keyword"
+  },
+  "answerPostCount": {
+    "type": "number"
   }
 }
