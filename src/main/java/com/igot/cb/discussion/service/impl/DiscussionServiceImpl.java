@@ -76,7 +76,8 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
         try {
             ((ObjectNode) discussionDetails).put(Constants.CREATED_BY, userId);
-            ((ObjectNode) discussionDetails).put(Constants.VOTE_COUNT,0);
+            ((ObjectNode) discussionDetails).put(Constants.UP_VOTE_COUNT,0L);
+            ((ObjectNode) discussionDetails).put(Constants.DOWN_VOTE_COUNT,0L);
             ((ObjectNode) discussionDetails).put(Constants.MEDIA,discussionDetails.get(Constants.MEDIA));
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
@@ -348,55 +349,43 @@ public class DiscussionServiceImpl implements DiscussionService {
         return response;
     }
 
-    @Override
-    public ApiResponse updateUpVote(Map<String, Object> upVoteData, String token) {
-        log.info("DiscussionServiceImpl::updateUpVote");
-        ApiResponse response = ProjectUtil.createDefaultResponse("discussion.updateUpVote");
-        String errorMsg = validateUpvoteData(upVoteData);
-        if (StringUtils.isNotEmpty(errorMsg)) {
-            createErrorResponse(response, errorMsg, HttpStatus.BAD_REQUEST, Constants.FAILED);
-            return response;
-        }
+    private ApiResponse vote(String discussionId, String token, String voteType) {
+        log.info("DiscussionServiceImpl::vote - Type: {}", voteType);
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_VOTE_API);
         try {
             String userId = accessTokenValidator.verifyUserToken(token);
             if (StringUtils.isEmpty(userId)) {
                 createErrorResponse(response, Constants.INVALID_AUTH_TOKEN, HttpStatus.BAD_REQUEST, Constants.FAILED);
                 return response;
             }
-            Optional<DiscussionEntity> discussionEntity = Optional.of(discussionRepository.findById(upVoteData.get(Constants.DISCUSSION_ID).toString()).get());
+
+            Optional<DiscussionEntity> discussionEntity = Optional.of(discussionRepository.findById(discussionId).orElse(null));
+            if (!discussionEntity.isPresent()) {
+                createErrorResponse(response, Constants.DISCUSSION_NOT_FOUND, HttpStatus.BAD_REQUEST, Constants.FAILED);
+                return response;
+            }
+
             DiscussionEntity discussionDbData = discussionEntity.get();
             HashMap<String, Object> discussionData = objectMapper.convertValue(discussionDbData.getData(), HashMap.class);
             if (!discussionDbData.getIsActive()) {
                 createErrorResponse(response, Constants.DISCUSSION_IS_INACTIVE, HttpStatus.BAD_REQUEST, Constants.FAILED);
                 return response;
             }
-            Object voteCountObj = discussionData.get(Constants.VOTE_COUNT);
-            long existingVoteCount = 0L;
-            if (voteCountObj instanceof Integer) {
-                existingVoteCount = ((Integer) voteCountObj).longValue();
-            } else if (voteCountObj instanceof Long) {
-                existingVoteCount = (Long) voteCountObj;
-            }
-            String voteType = (String) upVoteData.get(Constants.VOTETYPE);
-            long vote = 0;
-            switch (voteType) {
-                case Constants.UP:
-                    vote = 1L;
-                    break;
-                case Constants.DOWN:
-                    vote = -1L;
-                    break;
-                default:
-                    break;
-            }
+
+            Object upVoteCountObj = discussionData.get(Constants.UP_VOTE_COUNT);
+            Object downVoteCountObj = discussionData.get(Constants.DOWN_VOTE_COUNT);
+            long existingUpVoteCount = (upVoteCountObj instanceof Number) ? ((Number) upVoteCountObj).longValue() : 0L;
+            long existingDownVoteCount = (downVoteCountObj instanceof Number) ? ((Number) downVoteCountObj).longValue() : 0L;
+
             Map<String, Object> properties = new HashMap<>();
-            properties.put(Constants.DISCUSSION_ID_KEY, upVoteData.get(Constants.DISCUSSION_ID));
+            properties.put(Constants.DISCUSSION_ID_KEY, discussionId);
             properties.put(Constants.USERID, userId);
             List<Map<String, Object>> existingResponseList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(Constants.KEYSPACE_SUNBIRD, Constants.USER_DISCUSSION_VOTES, properties, null, null);
+
             if (existingResponseList.isEmpty()) {
                 Map<String, Object> propertyMap = new HashMap<>();
                 propertyMap.put(Constants.USER_ID_RQST, userId);
-                propertyMap.put(Constants.DISCUSSION_ID_KEY, upVoteData.get(Constants.DISCUSSION_ID));
+                propertyMap.put(Constants.DISCUSSION_ID_KEY, discussionId);
                 propertyMap.put(Constants.VOTE_TYPE, voteType);
 
                 ApiResponse result = (ApiResponse) cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.USER_DISCUSSION_VOTES, propertyMap);
@@ -405,32 +394,39 @@ public class DiscussionServiceImpl implements DiscussionService {
                     response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
                     return response;
                 }
-                long newVoteCount = existingVoteCount + vote;
-                discussionData.put(Constants.VOTE_COUNT, newVoteCount);
+                if (voteType.equals(Constants.UP)) {
+                    discussionData.put(Constants.UP_VOTE_COUNT, existingUpVoteCount + 1);
+                } else {
+                    discussionData.put(Constants.DOWN_VOTE_COUNT, existingDownVoteCount + 1);
+                }
             } else {
                 Map<String, Object> userVoteData = existingResponseList.get(0);
                 if (userVoteData.get(Constants.VOTE_TYPE).equals(voteType)) {
                     createErrorResponse(response, String.format(Constants.USER_ALREADY_VOTED, voteType), HttpStatus.ALREADY_REPORTED, Constants.FAILED);
                     return response;
                 }
+
                 Map<String, Object> updateAttribute = new HashMap<>();
                 updateAttribute.put(Constants.VOTE_TYPE, voteType);
                 Map<String, Object> compositeKeys = new HashMap<>();
                 compositeKeys.put(Constants.USER_ID_RQST, userId);
-                compositeKeys.put(Constants.DISCUSSION_ID_KEY, upVoteData.get(Constants.DISCUSSION_ID));
+                compositeKeys.put(Constants.DISCUSSION_ID_KEY, discussionId);
+
                 Map<String, Object> result = cassandraOperation.updateRecordByCompositeKey(Constants.KEYSPACE_SUNBIRD, Constants.USER_DISCUSSION_VOTES, updateAttribute, compositeKeys);
                 if (!result.get(Constants.RESPONSE).equals(Constants.SUCCESS)) {
                     createErrorResponse(response, Constants.FAILED_TO_VOTE, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
                     return response;
                 }
-                if (userVoteData.get(Constants.VOTE_TYPE).equals(Constants.UP) && voteType.equals(Constants.DOWN)) {
-                    vote = -2L;
+
+                if (voteType.equals(Constants.UP)) {
+                    discussionData.put(Constants.UP_VOTE_COUNT, existingUpVoteCount + 1);
+                    discussionData.put(Constants.DOWN_VOTE_COUNT, existingDownVoteCount - 1);
                 } else {
-                    vote = 2L;
+                    discussionData.put(Constants.UP_VOTE_COUNT, existingUpVoteCount - 1);
+                    discussionData.put(Constants.DOWN_VOTE_COUNT, existingDownVoteCount + 1);
                 }
-                long newVoteCount = existingVoteCount + vote;
-                discussionData.put(Constants.VOTE_COUNT, newVoteCount);
             }
+
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             discussionDbData.setUpdatedOn(currentTime);
             JsonNode jsonNode = objectMapper.valueToTree(discussionData);
@@ -441,9 +437,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);
         } catch (Exception e) {
-            log.error("Error while updating upvote: {}", e.getMessage(), e);
+            log.error("Error while processing vote: {}", e.getMessage(), e);
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
-            return response;
         }
         return response;
     }
@@ -660,5 +655,15 @@ public class DiscussionServiceImpl implements DiscussionService {
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
         esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(discussionId), map, cbServerProperties.getElasticDiscussionJsonPath());
         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+    }
+
+    @Override
+    public ApiResponse upVote(String discussionId, String token) {
+        return vote(discussionId, token, Constants.UP);
+    }
+
+    @Override
+    public ApiResponse downVote(String discussionId, String token) {
+        return vote(discussionId, token, Constants.DOWN);
     }
 }

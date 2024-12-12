@@ -23,7 +23,10 @@
   "targetTopic": {
     "type": "keyword"
   },
-  "voteCount": {
+  "upVoteCount": {
+    "type": "number"
+  },
+  "downVoteCount": {
     "type": "number"
   },
   "createdOn": {

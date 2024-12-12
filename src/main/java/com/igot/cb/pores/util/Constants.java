@@ -127,6 +127,10 @@ public class Constants {
     public static final String INVALID_PARENT_DISCUSSION_ID = "invalid Parent Discussion Id Please provide a valid discussion id";
     public static final String ANSWER_POST = "answerPost";
     public static final String ANSWER_POST_COUNT = "answerPostCount";
+    public static final String DISCUSSION_NOT_FOUND = "DiscussionId not found Please provide a valid discussion id";
+    public static final String UP_VOTE_COUNT = "upVoteCount";
+    public static final String DOWN_VOTE_COUNT = "downVoteCount";
+    public static final String DISCUSSION_VOTE_API = "discussion.vote";
     private Constants() {
     }
 }
