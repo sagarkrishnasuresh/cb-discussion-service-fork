@@ -4,7 +4,10 @@
   "properties": {
     "type": {
       "type": "string",
-      "enum": ["question", "feedback","blog","story","poll"]
+      "enum": ["answerPost"]
+    },
+    "parentDiscussionId": {
+      "type": "string"
     },
     "title": {
       "type": "string"
@@ -30,6 +33,7 @@
   },
   "required": [
     "type",
-    "title"
+    "title",
+    "parentDiscussionId"
   ]
 }

@@ -19,4 +19,6 @@ public class CbServerProperties {
   @Value("${elastic.required.field.discussion.json.path}")
   private String elasticDiscussionJsonPath;
 
+  @Value("${discussion.entity}")
+  private String discussionEntity;
 }

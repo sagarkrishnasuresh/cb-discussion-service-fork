@@ -67,7 +67,6 @@ public class Constants {
     public static final String UNKNOWN_IDENTIFIER = "Unknown identifier ";
     public static final String EXCEPTION_MSG_UPDATE = "Exception occurred while updating record to ";
     public static final String DISCUSSION_VALIDATION_FILE = "/payloadValidation/discussionValidation.json";
-    public static final String DISCUSSION_INDEX = "discussion_entity";
     public static final String FAILED_TO_CREATE_DISCUSSION = "Failed to create the discussion";
     public static final String SEARCH_RESULTS = "search_results";
     public static final String DISCUSSION_ID = "discussionId";
@@ -109,7 +108,29 @@ public class Constants {
     public static final String FAILED_CONST = "FAILED";
     public static final String X_AUTH_TOKEN = "x-authenticated-user-token";
     public static final String UPDATED_ON = "updatedOn";
-
+    public static final String MEDIA = "mediaUrls";
+    public static final String USER_PREFIX = "user:" ;
+    public static final String USER_TABLE = "user";
+    public static final String PROFILE_DETAILS = "profiledetails";
+    public static final String FIRST_NAME = "firstname";
+    public static final String USER_ID_KEY = "user_id";
+    public static final String FIRST_NAME_KEY = "first_name";
+    public static final String PROFILE_IMG_KEY = "user_profile_img_url";
+    public static final String PROFILE_IMG = "profileImageUrl";
+    public static final String DESIGNATION_KEY = "designation";
+    public static final String EMPLOYMENT_DETAILS = "employmentDetails";
+    public static final String DEPARTMENT_KEY = "departmentName";
+    public static final String DEPARTMENT = "department";
+    public static final String DISCUSSION_ANSWER_POST_VALIDATION_FILE = "/payloadValidation/discussionAnswerPostValidation.json";
+    public static final String PARENT_DISCUSSION_ID = "parentDiscussionId";
+    public static final String FAILED_TO_CREATE_ANSWER_POST = "Failed to create the answer post";
+    public static final String INVALID_PARENT_DISCUSSION_ID = "invalid Parent Discussion Id Please provide a valid discussion id";
+    public static final String ANSWER_POST = "answerPost";
+    public static final String ANSWER_POST_COUNT = "answerPostCount";
+    public static final String DISCUSSION_NOT_FOUND = "DiscussionId not found Please provide a valid discussion id";
+    public static final String UP_VOTE_COUNT = "upVoteCount";
+    public static final String DOWN_VOTE_COUNT = "downVoteCount";
+    public static final String DISCUSSION_VOTE_API = "discussion.vote";
     private Constants() {
     }
 }

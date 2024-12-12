@@ -19,5 +19,9 @@ public interface DiscussionService {
 
     ApiResponse deleteDiscussion(String discussionId,String token);
 
-    ApiResponse updateUpVote(Map<String,Object> upVoteData, String token);
+    ApiResponse createAnswerPost(JsonNode answerPostData, String token);
+
+    ApiResponse upVote(String discussionId, String token);
+
+    ApiResponse downVote(String discussionId, String token);
 }
