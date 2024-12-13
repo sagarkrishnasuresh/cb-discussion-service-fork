@@ -600,7 +600,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
-            updateAnswerPostToDiscussion(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText());
+            updateAnswerPostToDiscussion(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText(), String.valueOf(id));
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
@@ -627,16 +627,13 @@ public class DiscussionServiceImpl implements DiscussionService {
         return true;
     }
 
-    private void updateAnswerPostToDiscussion(String discussionId) {
-        Optional<DiscussionEntity> entityOptional = discussionRepository.findById(discussionId);
-        DiscussionEntity discussionEntity = entityOptional.get();
+    private void updateAnswerPostToDiscussion(String parentDiscussionId, String discussionId) {
+        DiscussionEntity discussionEntity = discussionRepository.findById(parentDiscussionId).get();
         JsonNode data = discussionEntity.getData();
         if (data.has(Constants.ANSWER_POSTS)) {
             Set<String> answerPostSet = new HashSet<>();
-            if (data.has(Constants.ANSWER_POSTS)) {
-                ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
-                existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
-            }
+            ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
+            existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
             answerPostSet.add(discussionId);
             ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
             ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
@@ -649,12 +646,12 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
         discussionEntity.setData(data);
         DiscussionEntity saveJsonEntity = discussionRepository.save(discussionEntity);
-        log.info("DiscussionService::updateAnswerPostToDiscussion:discussionEntity updated");
+        log.info("DiscussionService::updateAnswerPostToDiscussion: Discussion entity updated successfully");
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(discussionId), map, cbServerProperties.getElasticDiscussionJsonPath());
-        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, parentDiscussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + parentDiscussionId, jsonNode);
     }
 
     @Override
