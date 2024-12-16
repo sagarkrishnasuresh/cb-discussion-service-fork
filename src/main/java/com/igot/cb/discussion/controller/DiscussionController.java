@@ -71,4 +71,11 @@ public class DiscussionController {
         ApiResponse response = discussionService.downVote(discussionId, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
+
+    @PostMapping("/report")
+    public ResponseEntity<ApiResponse> report(@RequestBody Map<String, Object> reportData,
+                                               @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.report(token, reportData);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
 }

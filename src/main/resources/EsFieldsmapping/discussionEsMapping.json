@@ -54,5 +54,8 @@
   },
   "parentDiscussionId": {
     "type": "keyword"
+  },
+  "status": {
+    "type": "keyword"
   }
 }

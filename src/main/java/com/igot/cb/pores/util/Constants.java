@@ -131,6 +131,14 @@ public class Constants {
     public static final String UP_VOTE_COUNT = "upVoteCount";
     public static final String DOWN_VOTE_COUNT = "downVoteCount";
     public static final String DISCUSSION_VOTE_API = "discussion.vote";
+    public static final String STATUS = "status";
+    public static final String REPORTED_BY = "reportedBy";
+    public static final String SUSPENDED = "suspended";
+    public static final String REPORTED_REASON = "reportedDueTo";
+    public static final String OTHER_REASON = "otherReasons";
+    public static final String ACTIVE = "active";
+    public static final String DISCUSSION_SUSPENDED = "discussion Already suspended";
+    public static final String DISCUSSION_REPORT_FAILED = "Failed to report discussion";
     private Constants() {
     }
 }
