@@ -24,4 +24,6 @@ public interface DiscussionService {
     ApiResponse upVote(String discussionId, String token);
 
     ApiResponse downVote(String discussionId, String token);
+
+    ApiResponse report(String token, Map<String, Object> reportData);
 }
