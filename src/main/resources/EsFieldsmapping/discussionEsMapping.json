@@ -6,13 +6,16 @@
     "type": "keyword"
   },
   "title": {
-    "type": "text"
+    "type": "keyword"
   },
   "description": {
-    "type": "text"
+    "type": "keyword"
   },
   "tags": {
     "type": "keyword"
+  },
+  "createdBy": {
+  "type": "keyword"
   },
   "isActive": {
     "type": "boolean"
@@ -20,7 +23,10 @@
   "targetTopic": {
     "type": "keyword"
   },
-  "voteCount": {
+  "upVoteCount": {
+    "type": "number"
+  },
+  "downVoteCount": {
     "type": "number"
   },
   "createdOn": {
@@ -36,5 +42,20 @@
       "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
       "epoch_millis"
     ]
+  },
+  "mediaUrls": {
+    "type": "keyword"
+  },
+  "answerPosts": {
+    "type": "keyword"
+  },
+  "answerPostCount": {
+    "type": "number"
+  },
+  "parentDiscussionId": {
+    "type": "keyword"
+  },
+  "status": {
+    "type": "keyword"
   }
 }

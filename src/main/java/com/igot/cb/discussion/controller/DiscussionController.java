@@ -51,10 +51,31 @@ public class DiscussionController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @PostMapping("/upvote")
-    public ResponseEntity<ApiResponse> updateUpVote(@RequestBody Map<String,Object> updateData,
-                                                       @RequestHeader(Constants.X_AUTH_TOKEN) String token){
-        ApiResponse response = discussionService.updateUpVote(updateData,token);
-        return new ResponseEntity<>(response,response.getResponseCode());
+    @PostMapping("/answerPosts")
+    public ResponseEntity<ApiResponse> answerPost(@RequestBody JsonNode answerPostData,
+                                                  @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.createAnswerPost(answerPostData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/upVote/{discussionId}")
+    public ResponseEntity<ApiResponse> upVote(@PathVariable String discussionId,
+                                              @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.upVote(discussionId, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/downVote/{discussionId}")
+    public ResponseEntity<ApiResponse> downVote(@PathVariable String discussionId,
+                                                @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.downVote(discussionId, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/report")
+    public ResponseEntity<ApiResponse> report(@RequestBody Map<String, Object> reportData,
+                                               @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.report(token, reportData);
+        return new ResponseEntity<>(response, response.getResponseCode());
     }
 }
