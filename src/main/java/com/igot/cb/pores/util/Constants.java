@@ -139,6 +139,11 @@ public class Constants {
     public static final String ACTIVE = "active";
     public static final String DISCUSSION_SUSPENDED = "discussion Already suspended";
     public static final String DISCUSSION_REPORT_FAILED = "Failed to report discussion";
+    public static final String DISCUSSION_UPLOAD_FILE = "api.discussion.uploadFile";
+    public static final String NAME = "name";
+    public static final String URL = "url";
+    public static final String UPLOAD_FILE = "api.file.upload";
+    public static final String DISCUSSION_FILE_EMPTY = "File is empty";
     private Constants() {
     }
 }

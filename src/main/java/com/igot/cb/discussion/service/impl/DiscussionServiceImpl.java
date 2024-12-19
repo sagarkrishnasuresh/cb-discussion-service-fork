@@ -27,7 +27,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.sunbird.cloud.storage.BaseStorageService;
+import org.sunbird.cloud.storage.factory.StorageConfig;
+import org.sunbird.cloud.storage.factory.StorageServiceFactory;
+import scala.Option;
+import java.time.LocalDate;
 
+import javax.annotation.PostConstruct;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.time.format.DateTimeFormatter;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +46,8 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class DiscussionServiceImpl implements DiscussionService {
+    private BaseStorageService storageService = null;
+
     @Autowired
     private PayloadValidation payloadValidation;
     @Autowired
@@ -56,6 +68,13 @@ public class DiscussionServiceImpl implements DiscussionService {
     private AccessTokenValidator accessTokenValidator;
     @Autowired
     private RedisTemplate<String, Object> redisTemp;
+
+    @PostConstruct
+    public void init() {
+        if (storageService == null) {
+            storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
+        }
+    }
 
     /**
      * Creates a new discussion based on the provided discussion details.
@@ -754,5 +773,58 @@ public class DiscussionServiceImpl implements DiscussionService {
         response.getParams().setErr(error);
         response.setMessage(status);
         return response;
+    }
+
+
+    @Override
+    public ApiResponse uploadFile(MultipartFile mFile) {
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_UPLOAD_FILE);
+        if(mFile.isEmpty()){
+            return returnErrorMsg(Constants.DISCUSSION_FILE_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+
+        File file = null;
+        try {
+            file = new File(System.currentTimeMillis() + "_" + mFile.getOriginalFilename());
+
+            file.createNewFile();
+            // Use try-with-resources to ensure FileOutputStream is closed
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                fos.write(mFile.getBytes());
+            }
+            String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            String uploadFolderPath = cbServerProperties.getDiscussionCloudFolderName() + "/" + yearMonth;
+            return uploadFile(file, uploadFolderPath, cbServerProperties.getDiscussionContainerName());
+        } catch (Exception e) {
+            log.error("Failed to upload file. Exception: ", e);
+            response.getParams().setStatus(Constants.FAILED);
+            response.getParams().setErrMsg("Failed to upload file. Exception: " + e.getMessage());
+            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        } finally {
+            if (file != null && file.exists()) {
+                file.delete();
+            }
+        }
+    }
+
+    public ApiResponse uploadFile(File file, String cloudFolderName, String containerName) {
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.UPLOAD_FILE);
+        try {
+            String objectKey = cloudFolderName + "/" + file.getName();
+            String url = storageService.upload(containerName, file.getAbsolutePath(),
+                    objectKey, Option.apply(false), Option.apply(1), Option.apply(5), Option.empty());
+            Map<String, String> uploadedFile = new HashMap<>();
+            uploadedFile.put(Constants.NAME, file.getName());
+            uploadedFile.put(Constants.URL, url);
+            response.getResult().putAll(uploadedFile);
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to upload file. Exception: ", e);
+            response.getParams().setStatus(Constants.FAILED);
+            response.getParams().setErrMsg("Failed to upload file. Exception: " + e.getMessage());
+            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        }
     }
 }

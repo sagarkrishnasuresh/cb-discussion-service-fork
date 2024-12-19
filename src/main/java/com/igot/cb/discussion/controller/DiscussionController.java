@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -77,5 +78,11 @@ public class DiscussionController {
                                                @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = discussionService.report(token, reportData);
         return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/fileUpload")
+    public ResponseEntity<ApiResponse> uploadFile(@RequestParam(value = "file", required = true) MultipartFile multipartFile){
+        ApiResponse uploadResponse = discussionService.uploadFile(multipartFile);
+        return new ResponseEntity<>(uploadResponse, uploadResponse.getResponseCode());
     }
 }
