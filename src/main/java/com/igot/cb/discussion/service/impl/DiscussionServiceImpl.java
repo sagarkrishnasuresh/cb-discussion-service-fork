@@ -27,7 +27,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.sunbird.cloud.storage.BaseStorageService;
+import org.sunbird.cloud.storage.factory.StorageConfig;
+import org.sunbird.cloud.storage.factory.StorageServiceFactory;
+import scala.Option;
+import java.time.LocalDate;
 
+import javax.annotation.PostConstruct;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.time.format.DateTimeFormatter;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +46,8 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class DiscussionServiceImpl implements DiscussionService {
+    private BaseStorageService storageService = null;
+
     @Autowired
     private PayloadValidation payloadValidation;
     @Autowired
@@ -56,6 +68,13 @@ public class DiscussionServiceImpl implements DiscussionService {
     private AccessTokenValidator accessTokenValidator;
     @Autowired
     private RedisTemplate<String, Object> redisTemp;
+
+    @PostConstruct
+    public void init() {
+        if (storageService == null) {
+            storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
+        }
+    }
 
     /**
      * Creates a new discussion based on the provided discussion details.
@@ -79,6 +98,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             ((ObjectNode) discussionDetails).put(Constants.UP_VOTE_COUNT,0L);
             ((ObjectNode) discussionDetails).put(Constants.DOWN_VOTE_COUNT,0L);
             ((ObjectNode) discussionDetails).put(Constants.MEDIA,discussionDetails.get(Constants.MEDIA));
+            ((ObjectNode) discussionDetails).put(Constants.STATUS,Constants.ACTIVE);
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
@@ -600,7 +620,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
-            updateAnswerPostToDiscussion(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText());
+            updateAnswerPostToDiscussion(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText(), String.valueOf(id));
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
@@ -627,16 +647,13 @@ public class DiscussionServiceImpl implements DiscussionService {
         return true;
     }
 
-    private void updateAnswerPostToDiscussion(String discussionId) {
-        Optional<DiscussionEntity> entityOptional = discussionRepository.findById(discussionId);
-        DiscussionEntity discussionEntity = entityOptional.get();
+    private void updateAnswerPostToDiscussion(String parentDiscussionId, String discussionId) {
+        DiscussionEntity discussionEntity = discussionRepository.findById(parentDiscussionId).get();
         JsonNode data = discussionEntity.getData();
         if (data.has(Constants.ANSWER_POSTS)) {
             Set<String> answerPostSet = new HashSet<>();
-            if (data.has(Constants.ANSWER_POSTS)) {
-                ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
-                existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
-            }
+            ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
+            existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
             answerPostSet.add(discussionId);
             ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
             ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
@@ -649,12 +666,12 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
         discussionEntity.setData(data);
         DiscussionEntity saveJsonEntity = discussionRepository.save(discussionEntity);
-        log.info("DiscussionService::updateAnswerPostToDiscussion:discussionEntity updated");
+        log.info("DiscussionService::updateAnswerPostToDiscussion: Discussion entity updated successfully");
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(discussionId), map, cbServerProperties.getElasticDiscussionJsonPath());
-        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, parentDiscussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + parentDiscussionId, jsonNode);
     }
 
     @Override
@@ -665,5 +682,149 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Override
     public ApiResponse downVote(String discussionId, String token) {
         return vote(discussionId, token, Constants.DOWN);
+    }
+
+    @Override
+    public ApiResponse report(String token, Map<String, Object> reportData) {
+        log.info("DiscussionService::report: Reporting discussion");
+        ApiResponse response = ProjectUtil.createDefaultResponse("discussion.report");
+        String errorMsg = validateReportPayload(reportData);
+        if (StringUtils.isNotEmpty(errorMsg)) {
+            return returnErrorMsg(errorMsg, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
+            return returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
+        }
+
+        try {
+            String discussionId = (String) reportData.get(Constants.DISCUSSION_ID);
+            Optional<DiscussionEntity> discussionDbData = discussionRepository.findById(discussionId);
+            if (!discussionDbData.isPresent()) {
+                return returnErrorMsg(Constants.DISCUSSION_NOT_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
+            }
+
+            DiscussionEntity discussionEntity = discussionDbData.get();
+            if (!discussionEntity.getIsActive()) {
+                return returnErrorMsg(Constants.DISCUSSION_IS_INACTIVE, HttpStatus.CONFLICT, response, Constants.FAILED);
+            }
+
+            JsonNode data = discussionEntity.getData();
+            String currentStatus = data.has(Constants.STATUS) ? data.get(Constants.STATUS).asText() : null;
+
+            if (Constants.SUSPENDED.equals(currentStatus)) {
+                return returnErrorMsg(Constants.DISCUSSION_SUSPENDED, HttpStatus.ALREADY_REPORTED, response, Constants.FAILED);
+            }
+
+            ((ObjectNode) data).put(Constants.STATUS, Constants.SUSPENDED);
+            ArrayNode reportedByNode = data.has(Constants.REPORTED_BY) ? (ArrayNode) data.get(Constants.REPORTED_BY) : objectMapper.createArrayNode();
+            reportedByNode.add(userId);
+            ((ObjectNode) data).put(Constants.REPORTED_REASON, objectMapper.valueToTree(reportData.get(Constants.REPORTED_REASON)));
+            ((ObjectNode) data).put(Constants.REPORTED_BY, reportedByNode);
+
+            discussionEntity.setData(data);
+            discussionRepository.save(discussionEntity);
+            log.info("DiscussionService::report: Discussion entity updated successfully");
+
+            ObjectNode jsonNode = objectMapper.createObjectNode();
+            jsonNode.setAll((ObjectNode) discussionEntity.getData());
+            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+            cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+            return response;
+        } catch (Exception e) {
+            log.error("DiscussionService::report: Failed to report discussion", e);
+            return returnErrorMsg(Constants.DISCUSSION_REPORT_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+        }
+    }
+
+    private String validateReportPayload(Map<String, Object> reportData) {
+        StringBuffer errorMsg = new StringBuffer();
+        List<String> errList = new ArrayList<>();
+
+        if (reportData.containsKey(Constants.DISCUSSION_ID) && StringUtils.isBlank((String) reportData.get(Constants.DISCUSSION_ID))){
+            errList.add(Constants.DISCUSSION_ID);
+        }
+        if (reportData.containsKey(Constants.REPORTED_REASON)) {
+            Object reportedReasonObj = reportData.get(Constants.REPORTED_REASON);
+            if (reportedReasonObj instanceof List) {
+                List<String> reportedReasonList = (List<String>) reportedReasonObj;
+                if (reportedReasonList.isEmpty()) {
+                    errList.add(Constants.REPORTED_REASON);
+                } else if (reportedReasonList.contains("Others")) {
+                    if (!reportData.containsKey(Constants.OTHER_REASON) ||
+                            StringUtils.isBlank((String) reportData.get(Constants.OTHER_REASON))) {
+                        errList.add(Constants.OTHER_REASON);
+                    }
+                }
+            } else {
+                errList.add(Constants.REPORTED_REASON);
+            }
+        }
+        if (!errList.isEmpty()) {
+            errorMsg.append("Failed Due To Missing Params - ").append(errList).append(".");
+        }
+        return errorMsg.toString();
+    }
+
+    private  ApiResponse returnErrorMsg(String error, HttpStatus type, ApiResponse response, String status) {
+        response.setResponseCode(type);
+        response.getParams().setErr(error);
+        response.setMessage(status);
+        return response;
+    }
+
+
+    @Override
+    public ApiResponse uploadFile(MultipartFile mFile) {
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_UPLOAD_FILE);
+        if(mFile.isEmpty()){
+            return returnErrorMsg(Constants.DISCUSSION_FILE_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+
+        File file = null;
+        try {
+            file = new File(System.currentTimeMillis() + "_" + mFile.getOriginalFilename());
+
+            file.createNewFile();
+            // Use try-with-resources to ensure FileOutputStream is closed
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                fos.write(mFile.getBytes());
+            }
+            String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            String uploadFolderPath = cbServerProperties.getDiscussionCloudFolderName() + "/" + yearMonth;
+            return uploadFile(file, uploadFolderPath, cbServerProperties.getDiscussionContainerName());
+        } catch (Exception e) {
+            log.error("Failed to upload file. Exception: ", e);
+            response.getParams().setStatus(Constants.FAILED);
+            response.getParams().setErrMsg("Failed to upload file. Exception: " + e.getMessage());
+            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        } finally {
+            if (file != null && file.exists()) {
+                file.delete();
+            }
+        }
+    }
+
+    public ApiResponse uploadFile(File file, String cloudFolderName, String containerName) {
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.UPLOAD_FILE);
+        try {
+            String objectKey = cloudFolderName + "/" + file.getName();
+            String url = storageService.upload(containerName, file.getAbsolutePath(),
+                    objectKey, Option.apply(false), Option.apply(1), Option.apply(5), Option.empty());
+            Map<String, String> uploadedFile = new HashMap<>();
+            uploadedFile.put(Constants.NAME, file.getName());
+            uploadedFile.put(Constants.URL, url);
+            response.getResult().putAll(uploadedFile);
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to upload file. Exception: ", e);
+            response.getParams().setStatus(Constants.FAILED);
+            response.getParams().setErrMsg("Failed to upload file. Exception: " + e.getMessage());
+            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        }
     }
 }

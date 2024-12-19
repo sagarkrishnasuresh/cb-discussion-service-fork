@@ -51,5 +51,11 @@
   },
   "answerPostCount": {
     "type": "number"
+  },
+  "parentDiscussionId": {
+    "type": "keyword"
+  },
+  "status": {
+    "type": "keyword"
   }
 }
