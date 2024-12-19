@@ -29,7 +29,6 @@ if(params.enable_code_analysis){
 	     }
         }
 
-=======
 
         stage('docker-pre-build') {
             sh '''
