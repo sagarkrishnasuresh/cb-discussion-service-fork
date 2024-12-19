@@ -779,6 +779,9 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Override
     public ApiResponse uploadFile(MultipartFile mFile) {
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_UPLOAD_FILE);
+        if(mFile.isEmpty()){
+            return returnErrorMsg(Constants.DISCUSSION_FILE_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
 
         File file = null;
         try {
@@ -822,10 +825,6 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.getParams().setErrMsg("Failed to upload file. Exception: " + e.getMessage());
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response;
-        } finally {
-            if (file != null) {
-                file.delete();
-            }
         }
     }
 }
