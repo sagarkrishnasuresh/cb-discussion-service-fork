@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -51,10 +52,37 @@ public class DiscussionController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @PostMapping("/upvote")
-    public ResponseEntity<ApiResponse> updateUpVote(@RequestBody Map<String,Object> updateData,
-                                                       @RequestHeader(Constants.X_AUTH_TOKEN) String token){
-        ApiResponse response = discussionService.updateUpVote(updateData,token);
-        return new ResponseEntity<>(response,response.getResponseCode());
+    @PostMapping("/answerPosts")
+    public ResponseEntity<ApiResponse> answerPost(@RequestBody JsonNode answerPostData,
+                                                  @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.createAnswerPost(answerPostData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/upVote/{discussionId}")
+    public ResponseEntity<ApiResponse> upVote(@PathVariable String discussionId,
+                                              @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.upVote(discussionId, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/downVote/{discussionId}")
+    public ResponseEntity<ApiResponse> downVote(@PathVariable String discussionId,
+                                                @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.downVote(discussionId, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/report")
+    public ResponseEntity<ApiResponse> report(@RequestBody Map<String, Object> reportData,
+                                               @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.report(token, reportData);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/fileUpload")
+    public ResponseEntity<ApiResponse> uploadFile(@RequestParam(value = "file", required = true) MultipartFile multipartFile){
+        ApiResponse uploadResponse = discussionService.uploadFile(multipartFile);
+        return new ResponseEntity<>(uploadResponse, uploadResponse.getResponseCode());
     }
 }

@@ -5,6 +5,7 @@ import com.igot.cb.pores.util.ApiRespParam;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.igot.cb.pores.util.ApiResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 @Service
@@ -19,5 +20,13 @@ public interface DiscussionService {
 
     ApiResponse deleteDiscussion(String discussionId,String token);
 
-    ApiResponse updateUpVote(Map<String,Object> upVoteData, String token);
+    ApiResponse createAnswerPost(JsonNode answerPostData, String token);
+
+    ApiResponse upVote(String discussionId, String token);
+
+    ApiResponse downVote(String discussionId, String token);
+
+    ApiResponse report(String token, Map<String, Object> reportData);
+
+    ApiResponse uploadFile(MultipartFile file);
 }
