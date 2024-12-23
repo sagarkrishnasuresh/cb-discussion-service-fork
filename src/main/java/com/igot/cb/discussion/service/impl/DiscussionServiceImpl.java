@@ -587,9 +587,19 @@ public class DiscussionServiceImpl implements DiscussionService {
         log.info("DiscussionService::createAnswerPost:creating answerPost");
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.createAnswerPost");
         payloadValidation.validatePayload(Constants.DISCUSSION_ANSWER_POST_VALIDATION_FILE, answerPostData);
-        if (!validateDiscussionId(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText())) {
-            response.getParams().setErrMsg(Constants.INVALID_PARENT_DISCUSSION_ID);
-            response.setResponseCode(HttpStatus.BAD_REQUEST);
+        DiscussionEntity discussionEntity = discussionRepository.findById(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()).orElse(null);
+        if (discussionEntity == null || !discussionEntity.getIsActive()) {
+            returnErrorMsg(Constants.INVALID_PARENT_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return response;
+        }
+        JsonNode data = discussionEntity.getData();
+        String type = data.get(Constants.TYPE).asText();
+        if (type.equals(Constants.ANSWER_POST)) {
+            returnErrorMsg(Constants.PARENT_ANSWER_POST_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return response;
+        }
+        if (data.get(Constants.STATUS).asText().equals(Constants.SUSPENDED)) {
+            returnErrorMsg(Constants.PARENT_DISCUSSION_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             return response;
         }
         String userId = accessTokenValidator.verifyUserToken(token);
@@ -620,7 +630,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
-            updateAnswerPostToDiscussion(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText(), String.valueOf(id));
+            updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
@@ -647,8 +657,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         return true;
     }
 
-    private void updateAnswerPostToDiscussion(String parentDiscussionId, String discussionId) {
-        DiscussionEntity discussionEntity = discussionRepository.findById(parentDiscussionId).get();
+    private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId) {
         JsonNode data = discussionEntity.getData();
         if (data.has(Constants.ANSWER_POSTS)) {
             Set<String> answerPostSet = new HashSet<>();
@@ -670,8 +679,8 @@ public class DiscussionServiceImpl implements DiscussionService {
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, parentDiscussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
-        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + parentDiscussionId, jsonNode);
+        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
     }
 
     @Override
