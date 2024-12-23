@@ -721,6 +721,17 @@ public class DiscussionServiceImpl implements DiscussionService {
             ArrayNode reportedByNode = data.has(Constants.REPORTED_BY) ? (ArrayNode) data.get(Constants.REPORTED_BY) : objectMapper.createArrayNode();
             reportedByNode.add(userId);
             ((ObjectNode) data).put(Constants.REPORTED_REASON, objectMapper.valueToTree(reportData.get(Constants.REPORTED_REASON)));
+            if (reportData.containsKey(Constants.REPORTED_REASON) &&
+                    reportData.get(Constants.REPORTED_REASON) instanceof List) {
+                List<String> reportedReasonList = (List<String>) reportData.get(Constants.REPORTED_REASON);
+
+                if (reportedReasonList.contains(Constants.OTHERS) && reportData.containsKey(Constants.OTHER_REASON)) {
+                    String otherReason = (String) reportData.get(Constants.OTHER_REASON);
+                    if (!StringUtils.isBlank(otherReason)) {
+                        ((ObjectNode) data).put(Constants.ADDITIONAL_REPORT_REASONS, otherReason);
+                    }
+                }
+            }
             ((ObjectNode) data).put(Constants.REPORTED_BY, reportedByNode);
 
             discussionEntity.setData(data);
@@ -732,6 +743,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+            map.put(Constants.DISCUSSION_ID,reportData.get(Constants.DISCUSSION_ID));
+            response.setResult(map);
             return response;
         } catch (Exception e) {
             log.error("DiscussionService::report: Failed to report discussion", e);

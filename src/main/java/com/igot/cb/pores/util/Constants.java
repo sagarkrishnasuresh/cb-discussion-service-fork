@@ -144,6 +144,8 @@ public class Constants {
     public static final String URL = "url";
     public static final String UPLOAD_FILE = "api.file.upload";
     public static final String DISCUSSION_FILE_EMPTY = "File is empty";
+    public static final String ADDITIONAL_REPORT_REASONS = "additionalReportReasons";
+    public static final String OTHERS = "Others";
     private Constants() {
     }
 }
