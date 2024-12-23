@@ -644,19 +644,6 @@ public class DiscussionServiceImpl implements DiscussionService {
         return response;
     }
 
-    private boolean validateDiscussionId(String discussionId) {
-        DiscussionEntity discussionEntity = discussionRepository.findById(discussionId).orElse(null);
-        if (discussionEntity == null || !discussionEntity.getIsActive()) {
-            return false;
-        }
-        JsonNode data = discussionEntity.getData();
-        String type = data.get(Constants.TYPE).asText();
-        if (type.equals(Constants.ANSWER_POST)) {
-            return false;
-        }
-        return true;
-    }
-
     private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId) {
         JsonNode data = discussionEntity.getData();
         if (data.has(Constants.ANSWER_POSTS)) {
