@@ -257,13 +257,13 @@ public class DiscussionServiceImpl implements DiscussionService {
                     }
             );
 
-            if(searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()){
+           if(searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()){
                 Map<String, String> discussionToCreatedByMap = discussions.stream()
                         .collect(Collectors.toMap(
                                 discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
                                 discussion -> discussion.get(Constants.CREATED_BY).toString()));
 
-                Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
+            Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
 
                 List<Object> redisResults = fetchDataForKeys(
                         createdByIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
@@ -298,7 +298,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 }
                 JsonNode enhancedData = objectMapper.valueToTree(filteredDiscussions);
                 searchResult.setData(enhancedData);
-            }
+           }
 
             redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
