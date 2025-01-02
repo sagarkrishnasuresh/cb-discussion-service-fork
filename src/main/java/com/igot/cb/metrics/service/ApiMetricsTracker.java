@@ -14,15 +14,16 @@ public class ApiMetricsTracker {
         trackingEnabled.set(true);
     }
 
+    public static boolean isTrackingEnabled() {
+        return trackingEnabled.get();
+    }
+
     /**
      * Records an API call.
      *
      * @param apiEndpoint The API endpoint being tracked.
      */
     public static void recordApiCall(String apiEndpoint) {
-        if (!trackingEnabled.get()) {
-            return;
-        }
         ApiMetrics apiMetrics = apiMetricsMap.computeIfAbsent(apiEndpoint, k -> new ApiMetrics());
         apiMetrics.incrementApiCallCount();
     }
@@ -36,9 +37,6 @@ public class ApiMetricsTracker {
      * @param timeTaken   The time taken for the operation in milliseconds.
      */
     public static void recordDbOperation(String apiEndpoint, String dbName, String operation, long timeTaken) {
-        if (!trackingEnabled.get()) {
-            return;
-        }
         ApiMetrics apiMetrics = apiMetricsMap.computeIfAbsent(apiEndpoint, k -> new ApiMetrics());
         DbMetrics dbMetrics = apiMetrics.getDbMetricsMap().computeIfAbsent(dbName, k -> new DbMetrics());
 
