@@ -8,6 +8,11 @@ public class ApiMetricsTracker {
 
     // Centralized map to store metrics for each API endpoint
     private static final Map<String, ApiMetrics> apiMetricsMap = new ConcurrentHashMap<>();
+    private static final ThreadLocal<Boolean> trackingEnabled = ThreadLocal.withInitial(() -> false);
+
+    public static void enableTracking() {
+        trackingEnabled.set(true);
+    }
 
     /**
      * Records an API call.
@@ -15,6 +20,9 @@ public class ApiMetricsTracker {
      * @param apiEndpoint The API endpoint being tracked.
      */
     public static void recordApiCall(String apiEndpoint) {
+        if (!trackingEnabled.get()) {
+            return;
+        }
         ApiMetrics apiMetrics = apiMetricsMap.computeIfAbsent(apiEndpoint, k -> new ApiMetrics());
         apiMetrics.incrementApiCallCount();
     }
@@ -28,6 +36,9 @@ public class ApiMetricsTracker {
      * @param timeTaken   The time taken for the operation in milliseconds.
      */
     public static void recordDbOperation(String apiEndpoint, String dbName, String operation, long timeTaken) {
+        if (!trackingEnabled.get()) {
+            return;
+        }
         ApiMetrics apiMetrics = apiMetricsMap.computeIfAbsent(apiEndpoint, k -> new ApiMetrics());
         DbMetrics dbMetrics = apiMetrics.getDbMetricsMap().computeIfAbsent(dbName, k -> new DbMetrics());
 
