@@ -14,6 +14,7 @@ import com.igot.cb.authentication.util.AccessTokenValidator;
 import com.igot.cb.discussion.entity.DiscussionEntity;
 import com.igot.cb.discussion.repository.DiscussionRepository;
 import com.igot.cb.discussion.service.DiscussionService;
+import com.igot.cb.metrics.service.ApiMetricsTracker;
 import com.igot.cb.pores.cache.CacheService;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.elasticsearch.dto.SearchResult;
@@ -88,42 +89,49 @@ public class DiscussionServiceImpl implements DiscussionService {
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.create");
         payloadValidation.validatePayload(Constants.DISCUSSION_VALIDATION_FILE, discussionDetails);
         String userId = accessTokenValidator.verifyUserToken(token);
-        if (StringUtils.isBlank(userId)|| userId.equals(Constants.UNAUTHORIZED)) {
+        if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
             response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
             response.setResponseCode(HttpStatus.BAD_REQUEST);
             return response;
         }
+        updateMetricsApiCall(Constants.DISCUSSION_CREATE);
         try {
             ((ObjectNode) discussionDetails).put(Constants.CREATED_BY, userId);
-            ((ObjectNode) discussionDetails).put(Constants.UP_VOTE_COUNT,0L);
-            ((ObjectNode) discussionDetails).put(Constants.DOWN_VOTE_COUNT,0L);
-            ((ObjectNode) discussionDetails).put(Constants.MEDIA,discussionDetails.get(Constants.MEDIA));
-            ((ObjectNode) discussionDetails).put(Constants.STATUS,Constants.ACTIVE);
+            ((ObjectNode) discussionDetails).put(Constants.UP_VOTE_COUNT, 0L);
+            ((ObjectNode) discussionDetails).put(Constants.DOWN_VOTE_COUNT, 0L);
+            ((ObjectNode) discussionDetails).put(Constants.MEDIA, discussionDetails.get(Constants.MEDIA));
+            ((ObjectNode) discussionDetails).put(Constants.STATUS, Constants.ACTIVE);
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             UUID id = UUIDs.timeBased();
-            ((ObjectNode) discussionDetails).put(Constants.DISCUSSION_ID,String.valueOf(id));
+            ((ObjectNode) discussionDetails).put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
-            ((ObjectNode) discussionDetails).put(Constants.CREATED_ON,currentTime.toString());
+            ((ObjectNode) discussionDetails).put(Constants.CREATED_ON, currentTime.toString());
             jsonNodeEntity.setIsActive(true);
-            ((ObjectNode) discussionDetails).put(Constants.IS_ACTIVE,true);
+            ((ObjectNode) discussionDetails).put(Constants.IS_ACTIVE, true);
             jsonNodeEntity.setData(discussionDetails);
+            long postgresTime = System.currentTimeMillis();
             DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
+            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.INSERT, postgresTime);
             ObjectMapper objectMapper = new ObjectMapper();
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            long esTime = System.currentTimeMillis();
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
+            long redisTime = System.currentTimeMillis();
             cacheService.putCache("discussion_" + String.valueOf(id), jsonNode);
-            map.put(Constants.CREATED_ON,currentTime);
+            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.REDIS, Constants.INSERT, redisTime);
+            map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
-            createErrorResponse(response,Constants.FAILED_TO_CREATE_DISCUSSION,HttpStatus.INTERNAL_SERVER_ERROR,Constants.FAILED);
+            createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
             return response;
         }
         return response;
@@ -141,11 +149,14 @@ public class DiscussionServiceImpl implements DiscussionService {
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.read");
         if (StringUtils.isEmpty(discussionId)) {
             log.error("discussion not found");
-            createErrorResponse(response,Constants.ID_NOT_FOUND,HttpStatus.INTERNAL_SERVER_ERROR,Constants.FAILED);
+            createErrorResponse(response, Constants.ID_NOT_FOUND, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
             return response;
         }
         try {
+            updateMetricsApiCall(Constants.DISCUSSION_READ);
+            long redisTime = System.currentTimeMillis();
             String cachedJson = cacheService.getCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId);
+            updateMetricsDbOperation(Constants.DISCUSSION_READ, Constants.REDIS, Constants.READ, redisTime);
             if (StringUtils.isNotEmpty(cachedJson)) {
                 log.info("discussion Record coming from redis cache");
                 response.setMessage(Constants.SUCCESS);
@@ -153,7 +164,9 @@ public class DiscussionServiceImpl implements DiscussionService {
                 response.setResult((Map<String, Object>) objectMapper.readValue(cachedJson, new TypeReference<Object>() {
                 }));
             } else {
+                long postgresTime = System.currentTimeMillis();
                 Optional<DiscussionEntity> entityOptional = discussionRepository.findById(discussionId);
+                updateMetricsDbOperation(Constants.DISCUSSION_READ, Constants.POSTGRES, Constants.READ, postgresTime);
                 if (entityOptional.isPresent()) {
                     DiscussionEntity discussionEntity = entityOptional.get();
                     cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, discussionEntity.getData());
@@ -166,13 +179,13 @@ public class DiscussionServiceImpl implements DiscussionService {
                     response.getResult().put(Constants.CREATED_ON, discussionEntity.getCreatedOn());
                 } else {
                     log.error("Invalid discussionId: {}", discussionId);
-                    createErrorResponse(response,Constants.INVALID_ID,HttpStatus.NOT_FOUND,Constants.FAILED);
+                    createErrorResponse(response, Constants.INVALID_ID, HttpStatus.NOT_FOUND, Constants.FAILED);
                     return response;
                 }
             }
         } catch (Exception e) {
             log.error(" JSON for discussionId {}: {}", discussionId, e.getMessage(), e);
-            createErrorResponse(response,"Failed to read the discussion",HttpStatus.INTERNAL_SERVER_ERROR,Constants.FAILED);
+            createErrorResponse(response, "Failed to read the discussion", HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
             return response;
         }
         return response;
@@ -187,11 +200,15 @@ public class DiscussionServiceImpl implements DiscussionService {
      */
     @Override
     public ApiResponse updateDiscussion(JsonNode updateData, String token) {
+        ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("upate.Discussion");
         try {
             payloadValidation.validatePayload(Constants.DISCUSSION_UPDATE_VALIDATION_FILE, updateData);
+            updateMetricsApiCall(Constants.DISCUSSION_UPDATE);
             String discussionId = updateData.get(Constants.DISCUSSION_ID).asText();
+            long postgresTime = System.currentTimeMillis();
             Optional<DiscussionEntity> discussionEntity = discussionRepository.findById(discussionId);
+            updateMetricsDbOperation(Constants.DISCUSSION_UPDATE, Constants.POSTGRES, Constants.READ, postgresTime);
             if (!discussionEntity.isPresent()) {
                 createErrorResponse(response, "Discussion not found", HttpStatus.NOT_FOUND, Constants.FAILED);
                 return response;
@@ -209,16 +226,20 @@ public class DiscussionServiceImpl implements DiscussionService {
                 }
             }
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            ((ObjectNode) data).put(Constants.UPDATED_ON,String.valueOf(currentTime));
+            ((ObjectNode) data).put(Constants.UPDATED_ON, String.valueOf(currentTime));
             discussionDbData.setUpdatedOn(currentTime);
             discussionDbData.setData(data);
+            long postgresInsertTime = System.currentTimeMillis();
             discussionRepository.save(discussionDbData);
+            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.UPDATE_KEY, postgresInsertTime);
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.set(Constants.DISCUSSION_ID, new TextNode(discussionDbData.getDiscussionId()));
             jsonNode.setAll((ObjectNode) data);
 
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            long esTime = System.currentTimeMillis();
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            updateMetricsDbOperation(Constants.DISCUSSION_UPDATE, Constants.ELASTICSEARCH, Constants.UPDATE_KEY, esTime);
             Map<String, Object> responseMap = objectMapper.convertValue(discussionDbData, new TypeReference<Map<String, Object>>() {
             });
             response.setResponseCode(HttpStatus.OK);
@@ -236,8 +257,12 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Override
     public ApiResponse searchDiscussion(SearchCriteria searchCriteria) {
         log.info("DiscussionServiceImpl::searchDiscussion");
+        ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
-        SearchResult searchResult =  redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
+        updateMetricsApiCall(Constants.DISCUSSION_SEARCH);
+        long redisTime = System.currentTimeMillis();
+        SearchResult searchResult = redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
+        updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, "search", redisTime);
         if (searchResult != null) {
             log.info("DiscussionServiceImpl::searchDiscussion:  search result fetched from redis");
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
@@ -250,61 +275,67 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
         try {
+            long esTime = System.currentTimeMillis();
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+            updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.ELASTICSEARCH, "search", esTime);
             List<Map<String, Object>> discussions = objectMapper.convertValue(
                     searchResult.getData(),
                     new TypeReference<List<Map<String, Object>>>() {
                     }
             );
 
-            Map<String, String> discussionToCreatedByMap = discussions.stream()
-                    .collect(Collectors.toMap(
-                            discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
-                            discussion -> discussion.get(Constants.CREATED_BY).toString()));
+            if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
+                Map<String, String> discussionToCreatedByMap = discussions.stream()
+                        .collect(Collectors.toMap(
+                                discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
+                                discussion -> discussion.get(Constants.CREATED_BY).toString()));
 
-            Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
-
-            List<Object> redisResults = fetchDataForKeys(
-                    createdByIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
-            );
-            Map<String, Object> userDetailsMap = redisResults.stream()
-                    .map(user -> (Map<String, Object>) user)
-                    .collect(Collectors.toMap(
-                            user -> user.get(Constants.USER_ID_KEY).toString(),
-                            user -> user));
-
-            List<String> missingUserIds = createdByIds.stream()
-                    .filter(id -> !userDetailsMap.containsKey(id))
-                    .collect(Collectors.toList());
-
-            if (!missingUserIds.isEmpty()) {
-                List<Object> cassandraResults = fetchUserFromPrimary(missingUserIds);
-                userDetailsMap.putAll(cassandraResults.stream()
+                Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
+                long userDataRedisTime = System.currentTimeMillis();
+                List<Object> redisResults = fetchDataForKeys(
+                        createdByIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
+                );
+                updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.READ, userDataRedisTime);
+                Map<String, Object> userDetailsMap = redisResults.stream()
                         .map(user -> (Map<String, Object>) user)
                         .collect(Collectors.toMap(
                                 user -> user.get(Constants.USER_ID_KEY).toString(),
-                                user -> user)));
-            }
+                                user -> user));
 
-            List<Map<String, Object>> filteredDiscussions = new ArrayList<>();
-            for (Map<String, Object> discussion : discussions) {
-                String discussionId = discussion.get(Constants.DISCUSSION_ID).toString();
-                String createdById = discussionToCreatedByMap.get(discussionId);
-                if (createdById != null && userDetailsMap.containsKey(createdById)) {
-                    discussion.put(Constants.CREATED_BY, userDetailsMap.get(createdById));
-                    filteredDiscussions.add(discussion);
+                List<String> missingUserIds = createdByIds.stream()
+                        .filter(id -> !userDetailsMap.containsKey(id))
+                        .collect(Collectors.toList());
+
+                if (!missingUserIds.isEmpty()) {
+                    List<Object> cassandraResults = fetchUserFromPrimary(missingUserIds);
+                    userDetailsMap.putAll(cassandraResults.stream()
+                            .map(user -> (Map<String, Object>) user)
+                            .collect(Collectors.toMap(
+                                    user -> user.get(Constants.USER_ID_KEY).toString(),
+                                    user -> user)));
                 }
-            }
 
-            JsonNode enhancedData = objectMapper.valueToTree(filteredDiscussions);
-            searchResult.setData(enhancedData);
+                List<Map<String, Object>> filteredDiscussions = new ArrayList<>();
+                for (Map<String, Object> discussion : discussions) {
+                    String discussionId = discussion.get(Constants.DISCUSSION_ID).toString();
+                    String createdById = discussionToCreatedByMap.get(discussionId);
+                    if (createdById != null && userDetailsMap.containsKey(createdById)) {
+                        discussion.put(Constants.CREATED_BY, userDetailsMap.get(createdById));
+                        filteredDiscussions.add(discussion);
+                    }
+                }
+                JsonNode enhancedData = objectMapper.valueToTree(filteredDiscussions);
+                searchResult.setData(enhancedData);
+            }
+            long redisInsertTime = System.currentTimeMillis();
             redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
+            updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.INSERT, redisInsertTime);
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
             createSuccessResponse(response);
             return response;
         } catch (Exception e) {
+            log.error("error while searching discussion : {} .", e.getMessage(), e);
             createErrorResponse(response, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED_CONST);
-            redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
             return response;
         }
     }
@@ -532,10 +563,11 @@ public class DiscussionServiceImpl implements DiscussionService {
         List<Object> userList = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
         propertyMap.put(Constants.ID, userIds);
+        long startTime = System.currentTimeMillis();
         List<Map<String, Object>> userInfoList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
                 Constants.KEYSPACE_SUNBIRD, Constants.USER_TABLE, propertyMap,
                 Arrays.asList(Constants.PROFILE_DETAILS, Constants.FIRST_NAME, Constants.ID), null);
-
+        updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.CASSANDRA, Constants.READ, startTime);
         userList = userInfoList.stream()
                 .map(userInfo -> {
                     Map<String, Object> userMap = new HashMap<>();
@@ -553,20 +585,21 @@ public class DiscussionServiceImpl implements DiscussionService {
                         try {
                             // Convert JSON profile details to a Map
                             Map<String, Object> profileDetailsMap = objectMapper.readValue(profileDetails,
-                                    new TypeReference<HashMap<String, Object>>() {});
+                                    new TypeReference<HashMap<String, Object>>() {
+                                    });
 
                             // Check for profile image and add to userMap if available
                             if (MapUtils.isNotEmpty(profileDetailsMap)) {
-                                if (profileDetailsMap.containsKey(Constants.PROFILE_IMG) && StringUtils.isNotBlank((String) profileDetailsMap.get(Constants.PROFILE_IMG))){
+                                if (profileDetailsMap.containsKey(Constants.PROFILE_IMG) && StringUtils.isNotBlank((String) profileDetailsMap.get(Constants.PROFILE_IMG))) {
                                     userMap.put(Constants.PROFILE_IMG_KEY, (String) profileDetailsMap.get(Constants.PROFILE_IMG));
                                 }
                                 if (profileDetailsMap.containsKey(Constants.DESIGNATION_KEY) && StringUtils.isNotEmpty((String) profileDetailsMap.get(Constants.DESIGNATION_KEY))) {
 
                                     userMap.put(Constants.DESIGNATION_KEY, (String) profileDetailsMap.get(Constants.PROFILE_IMG));
                                 }
-                                if(profileDetailsMap.containsKey(Constants.EMPLOYMENT_DETAILS) && MapUtils.isNotEmpty(
+                                if (profileDetailsMap.containsKey(Constants.EMPLOYMENT_DETAILS) && MapUtils.isNotEmpty(
                                         (Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)) && ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).containsKey(Constants.DEPARTMENT_KEY) && StringUtils.isNotBlank(
-                                        (String) ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY))){
+                                        (String) ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY))) {
                                     userMap.put(Constants.DEPARTMENT, (String) ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY));
 
                                 }
@@ -587,17 +620,31 @@ public class DiscussionServiceImpl implements DiscussionService {
         log.info("DiscussionService::createAnswerPost:creating answerPost");
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.createAnswerPost");
         payloadValidation.validatePayload(Constants.DISCUSSION_ANSWER_POST_VALIDATION_FILE, answerPostData);
-        if (!validateDiscussionId(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText())) {
-            response.getParams().setErrMsg(Constants.INVALID_PARENT_DISCUSSION_ID);
-            response.setResponseCode(HttpStatus.BAD_REQUEST);
-            return response;
-        }
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
             response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
             response.setResponseCode(HttpStatus.BAD_REQUEST);
             return response;
         }
+        updateMetricsApiCall(Constants.DISCUSSION_ANSWER_POST);
+        long redisTimer = System.currentTimeMillis();
+        DiscussionEntity discussionEntity = discussionRepository.findById(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()).orElse(null);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.READ, redisTimer);
+        if (discussionEntity == null || !discussionEntity.getIsActive()) {
+            returnErrorMsg(Constants.INVALID_PARENT_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return response;
+        }
+        JsonNode data = discussionEntity.getData();
+        String type = data.get(Constants.TYPE).asText();
+        if (type.equals(Constants.ANSWER_POST)) {
+            returnErrorMsg(Constants.PARENT_ANSWER_POST_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return response;
+        }
+        if (data.get(Constants.STATUS).asText().equals(Constants.SUSPENDED)) {
+            returnErrorMsg(Constants.PARENT_DISCUSSION_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return response;
+        }
+
         try {
             ((ObjectNode) answerPostData).put(Constants.CREATED_BY, userId);
             ((ObjectNode) answerPostData).put(Constants.VOTE_COUNT, 0);
@@ -613,14 +660,20 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNodeEntity.setIsActive(true);
             ((ObjectNode) answerPostData).put(Constants.IS_ACTIVE, true);
             jsonNodeEntity.setData(answerPostData);
+            long timer = System.currentTimeMillis();
             DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
+            updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.INSERT, timer);
             ObjectMapper objectMapper = new ObjectMapper();
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            long esTime = System.currentTimeMillis();
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
+            long redisTimeData = System.currentTimeMillis();
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
-            updateAnswerPostToDiscussion(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText(), String.valueOf(id));
+            updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.INSERT, redisTimeData);
+            updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
@@ -634,21 +687,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         return response;
     }
 
-    private boolean validateDiscussionId(String discussionId) {
-        DiscussionEntity discussionEntity = discussionRepository.findById(discussionId).orElse(null);
-        if (discussionEntity == null || !discussionEntity.getIsActive()) {
-            return false;
-        }
-        JsonNode data = discussionEntity.getData();
-        String type = data.get(Constants.TYPE).asText();
-        if (type.equals(Constants.ANSWER_POST)) {
-            return false;
-        }
-        return true;
-    }
-
-    private void updateAnswerPostToDiscussion(String parentDiscussionId, String discussionId) {
-        DiscussionEntity discussionEntity = discussionRepository.findById(parentDiscussionId).get();
+    private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId) {
         JsonNode data = discussionEntity.getData();
         if (data.has(Constants.ANSWER_POSTS)) {
             Set<String> answerPostSet = new HashSet<>();
@@ -665,13 +704,19 @@ public class DiscussionServiceImpl implements DiscussionService {
             ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, 1);
         }
         discussionEntity.setData(data);
+        long postgresTime = System.currentTimeMillis();
         DiscussionEntity saveJsonEntity = discussionRepository.save(discussionEntity);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.UPDATE_KEY, postgresTime);
         log.info("DiscussionService::updateAnswerPostToDiscussion: Discussion entity updated successfully");
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, parentDiscussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
-        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + parentDiscussionId, jsonNode);
+        long esTime = System.currentTimeMillis();
+        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
+        long redisTime = System.currentTimeMillis();
+        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.INSERT, redisTime);
     }
 
     @Override
@@ -721,6 +766,17 @@ public class DiscussionServiceImpl implements DiscussionService {
             ArrayNode reportedByNode = data.has(Constants.REPORTED_BY) ? (ArrayNode) data.get(Constants.REPORTED_BY) : objectMapper.createArrayNode();
             reportedByNode.add(userId);
             ((ObjectNode) data).put(Constants.REPORTED_REASON, objectMapper.valueToTree(reportData.get(Constants.REPORTED_REASON)));
+            if (reportData.containsKey(Constants.REPORTED_REASON) &&
+                    reportData.get(Constants.REPORTED_REASON) instanceof List) {
+                List<String> reportedReasonList = (List<String>) reportData.get(Constants.REPORTED_REASON);
+
+                if (reportedReasonList.contains(Constants.OTHERS) && reportData.containsKey(Constants.OTHER_REASON)) {
+                    String otherReason = (String) reportData.get(Constants.OTHER_REASON);
+                    if (!StringUtils.isBlank(otherReason)) {
+                        ((ObjectNode) data).put(Constants.ADDITIONAL_REPORT_REASONS, otherReason);
+                    }
+                }
+            }
             ((ObjectNode) data).put(Constants.REPORTED_BY, reportedByNode);
 
             discussionEntity.setData(data);
@@ -732,6 +788,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+            map.put(Constants.DISCUSSION_ID,reportData.get(Constants.DISCUSSION_ID));
+            response.setResult(map);
             return response;
         } catch (Exception e) {
             log.error("DiscussionService::report: Failed to report discussion", e);
@@ -825,6 +883,18 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.getParams().setErrMsg("Failed to upload file. Exception: " + e.getMessage());
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response;
+        }
+    }
+
+    private void updateMetricsDbOperation(String apiName, String dbType, String operationType, long time) {
+        if (ApiMetricsTracker.isTrackingEnabled()) {
+            ApiMetricsTracker.recordDbOperation(apiName, dbType, operationType, System.currentTimeMillis() - time);
+        }
+    }
+
+    private void updateMetricsApiCall(String apiName) {
+        if (ApiMetricsTracker.isTrackingEnabled()) {
+            ApiMetricsTracker.recordApiCall(apiName);
         }
     }
 }

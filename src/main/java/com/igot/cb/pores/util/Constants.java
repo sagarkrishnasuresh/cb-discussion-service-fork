@@ -144,6 +144,22 @@ public class Constants {
     public static final String URL = "url";
     public static final String UPLOAD_FILE = "api.file.upload";
     public static final String DISCUSSION_FILE_EMPTY = "File is empty";
+    public static final String ADDITIONAL_REPORT_REASONS = "additionalReportReasons";
+    public static final String OTHERS = "Others";
+    public static final String PARENT_ANSWER_POST_ID_ERROR = "parentAnswerPostId cannot be of type answerPost";
+    public static final String PARENT_DISCUSSION_ID_ERROR = "parentDiscussion is suspended, Please provide a valid parentDiscussion id";
+    public static final String ELASTICSEARCH = "elasticsearch";
+    public static final String DISCUSSION_ANSWER_POST = "discussion/answerPosts";
+    public static final String REDIS = "redis";
+    public static final String DISCUSSION_CREATE = "discussion/create";
+    public static final String POSTGRES = "postgres";
+    public static final String DISCUSSION_UPDATE = "discussion/update";
+    public static final String READ = "read";
+    public static final String INSERT = "insert";
+    public static final String DISCUSSION_SEARCH = "discussion/search";
+    public static final String CASSANDRA = "cassandra";
+    public static final String DISCUSSION_READ = "discussion/read";
+    public static final String UPDATE_KEY = "update";
     private Constants() {
     }
 }
