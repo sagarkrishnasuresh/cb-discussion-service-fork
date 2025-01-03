@@ -8,14 +8,18 @@ public class ApiMetricsTracker {
 
     // Centralized map to store metrics for each API endpoint
     private static final Map<String, ApiMetrics> apiMetricsMap = new ConcurrentHashMap<>();
-    private static final ThreadLocal<Boolean> trackingEnabled = ThreadLocal.withInitial(() -> false);
+    private static boolean trackingEnabled = false;
 
     public static void enableTracking() {
-        trackingEnabled.set(true);
+        trackingEnabled = true;
+    }
+
+    public static void disableTracking() {
+        trackingEnabled = false;
     }
 
     public static boolean isTrackingEnabled() {
-        return trackingEnabled.get();
+        return trackingEnabled;
     }
 
     /**
