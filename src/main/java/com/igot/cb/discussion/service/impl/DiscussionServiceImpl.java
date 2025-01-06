@@ -629,7 +629,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         updateMetricsApiCall(Constants.DISCUSSION_ANSWER_POST);
         long redisTimer = System.currentTimeMillis();
         DiscussionEntity discussionEntity = discussionRepository.findById(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()).orElse(null);
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.READ, redisTimer);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.READ, redisTimer);
         if (discussionEntity == null || !discussionEntity.getIsActive()) {
             returnErrorMsg(Constants.INVALID_PARENT_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             return response;
@@ -713,7 +713,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
         long esTime = System.currentTimeMillis();
         esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.UPDATE_KEY, esTime);
         long redisTime = System.currentTimeMillis();
         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
         updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.INSERT, redisTime);
