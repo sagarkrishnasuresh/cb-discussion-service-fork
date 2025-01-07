@@ -905,11 +905,15 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            long esTime = System.currentTimeMillis();
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, saveJsonEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
             log.info("Updated Elasticsearch for discussion ID: {}", saveJsonEntity.getDiscussionId());
 
             // Redis update
+            long redisTime = System.currentTimeMillis();
             cacheService.putCache("discussion_" + saveJsonEntity.getDiscussionId(), jsonNode);
+            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.REDIS, Constants.INSERT, redisTime);
             log.info("Updated Redis cache for discussion ID: {}", saveJsonEntity.getDiscussionId());
         } catch (Exception e) {
             log.error("Failed to update Elasticsearch or Redis for discussion ID: {}", saveJsonEntity.getDiscussionId(), e);
