@@ -69,6 +69,8 @@ public class DiscussionServiceImpl implements DiscussionService {
     private AccessTokenValidator accessTokenValidator;
     @Autowired
     private RedisTemplate<String, Object> redisTemp;
+    @Autowired
+    private DiscussionAsyncProcess asyncService;
 
     @PostConstruct
     public void init() {
@@ -119,16 +121,12 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            long esTime = System.currentTimeMillis();
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
-            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
-            long redisTime = System.currentTimeMillis();
-            cacheService.putCache("discussion_" + String.valueOf(id), jsonNode);
-            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.REDIS, Constants.INSERT, redisTime);
+
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
+            asyncService.updateElasticsearchAndRedis(saveJsonEntity);
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -629,7 +627,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         updateMetricsApiCall(Constants.DISCUSSION_ANSWER_POST);
         long redisTimer = System.currentTimeMillis();
         DiscussionEntity discussionEntity = discussionRepository.findById(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()).orElse(null);
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.READ, redisTimer);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.READ, redisTimer);
         if (discussionEntity == null || !discussionEntity.getIsActive()) {
             returnErrorMsg(Constants.INVALID_PARENT_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             return response;
@@ -713,7 +711,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
         long esTime = System.currentTimeMillis();
         esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.UPDATE_KEY, esTime);
         long redisTime = System.currentTimeMillis();
         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
         updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.INSERT, redisTime);
