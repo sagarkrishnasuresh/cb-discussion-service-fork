@@ -27,6 +27,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.cloud.storage.BaseStorageService;
@@ -44,6 +46,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@EnableAsync
 @Service
 @Slf4j
 public class DiscussionServiceImpl implements DiscussionService {
@@ -119,16 +122,12 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            long esTime = System.currentTimeMillis();
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
-            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
-            long redisTime = System.currentTimeMillis();
-            cacheService.putCache("discussion_" + String.valueOf(id), jsonNode);
-            updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.REDIS, Constants.INSERT, redisTime);
+
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
+            updateElasticsearchAndRedis(saveJsonEntity);
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -895,6 +894,25 @@ public class DiscussionServiceImpl implements DiscussionService {
     private void updateMetricsApiCall(String apiName) {
         if (ApiMetricsTracker.isTrackingEnabled()) {
             ApiMetricsTracker.recordApiCall(apiName);
+        }
+    }
+
+    @Async
+    public void updateElasticsearchAndRedis(DiscussionEntity saveJsonEntity) {
+        try {
+            // Elasticsearch update
+            ObjectMapper objectMapper = new ObjectMapper();
+            ObjectNode jsonNode = objectMapper.createObjectNode();
+            jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
+            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, saveJsonEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            log.info("Updated Elasticsearch for discussion ID: {}", saveJsonEntity.getDiscussionId());
+
+            // Redis update
+            cacheService.putCache("discussion_" + saveJsonEntity.getDiscussionId(), jsonNode);
+            log.info("Updated Redis cache for discussion ID: {}", saveJsonEntity.getDiscussionId());
+        } catch (Exception e) {
+            log.error("Failed to update Elasticsearch or Redis for discussion ID: {}", saveJsonEntity.getDiscussionId(), e);
         }
     }
 }
