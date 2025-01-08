@@ -40,4 +40,10 @@ public class CbServerProperties {
   @Value("${cloud.storage.endpoint}")
   private String cloudStorageEndpoint;
 
+  @Value("${async.thread.pool.size}")
+  private int asyncThreadPoolSize;
+
+  @Value("${async.thread.max.pool.size}")
+  private int asyncThreadMaxPoolSize;
+
 }
