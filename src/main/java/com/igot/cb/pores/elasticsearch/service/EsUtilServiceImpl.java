@@ -66,9 +66,9 @@ public class EsUtilServiceImpl implements EsUtilService {
     public RestStatus addDocument(
             String esIndexName, String type, String id, Map<String, Object> document, String JsonFilePath) {
         log.info("EsUtilServiceImpl :: addDocument");
-        try {
-            JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance();
-            InputStream schemaStream = schemaFactory.getClass().getResourceAsStream(JsonFilePath);
+
+        try(InputStream schemaStream = JsonSchemaFactory.getInstance().getClass().getResourceAsStream(JsonFilePath)) {
+
             Map<String, Object> map = objectMapper.readValue(schemaStream,
                     new TypeReference<Map<String, Object>>() {
                     });
@@ -86,7 +86,7 @@ public class EsUtilServiceImpl implements EsUtilService {
             log.info("EsUtilServiceImpl :: addDocument :Insertion response {}", response.status());
             return response.status();
         } catch (Exception e) {
-            log.error("Issue while Indexing to es: {}", e.getMessage());
+            log.error("Issue while Indexing to es: {}", e.getMessage(),e);
             return null;
         }
     }
