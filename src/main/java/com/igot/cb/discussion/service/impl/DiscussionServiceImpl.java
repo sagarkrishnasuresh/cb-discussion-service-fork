@@ -41,6 +41,7 @@ import java.io.FileOutputStream;
 import java.time.format.DateTimeFormatter;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -69,8 +70,6 @@ public class DiscussionServiceImpl implements DiscussionService {
     private AccessTokenValidator accessTokenValidator;
     @Autowired
     private RedisTemplate<String, Object> redisTemp;
-    @Autowired
-    private DiscussionAsyncProcess asyncService;
 
     @PostConstruct
     public void init() {
@@ -122,11 +121,15 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
 
-            map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
-            asyncService.updateElasticsearchAndRedis(saveJsonEntity);
+            CompletableFuture.runAsync(() -> {
+                updateElasticsearch(saveJsonEntity.getDiscussionId(),map);
+            });
+            CompletableFuture.runAsync(() -> {
+                updateRedis(saveJsonEntity.getDiscussionId(),jsonNode);
+            });
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -893,6 +896,24 @@ public class DiscussionServiceImpl implements DiscussionService {
     private void updateMetricsApiCall(String apiName) {
         if (ApiMetricsTracker.isTrackingEnabled()) {
             ApiMetricsTracker.recordApiCall(apiName);
+        }
+    }
+
+    private void updateElasticsearch(String discussionId,Map<String, Object> map) {
+        try {
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+            log.info("Updated Elasticsearch for discussion ID: {}", discussionId);
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void updateRedis(String discussionId, ObjectNode jsonNode) {
+        try {
+            cacheService.putCache("discussion_" + discussionId, jsonNode);
+            log.info("Updated Redis cache for discussion ID: {}", discussionId);
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
         }
     }
 }
