@@ -12,6 +12,9 @@
     "description": {
       "type": "string"
     },
+    "communityId": {
+      "type": "string"
+    },
     "tags": {
       "type": "array",
       "items": {
@@ -30,6 +33,7 @@
   },
   "required": [
     "type",
-    "title"
+    "title",
+    "communityId"
   ]
 }

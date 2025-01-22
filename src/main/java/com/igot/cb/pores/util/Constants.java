@@ -98,7 +98,7 @@ public class Constants {
     public static final String INVALID_ID = "Invalid Id";
     public static final String TYPE = "type";
     public static final String TITLE = "title";
-    public static final String DESCRIPTION_PAYLOAD = "Description";
+    public static final String DESCRIPTION_PAYLOAD = "description";
     public static final String IS_ACTIVE = "isActive";
     public static final String DELETED_SUCCESSFULLY = "deleted successfully";
     public static final String NO_DATA_FOUND = "No data found";
@@ -160,6 +160,8 @@ public class Constants {
     public static final String CASSANDRA = "cassandra";
     public static final String DISCUSSION_READ = "discussion/read";
     public static final String UPDATE_KEY = "update";
+    public static final String SEARCHTAGS = "searchTags";
+    public static final String INVALID_COMMUNITY_ID = "Invalid communityId";
     private Constants() {
     }
 }
