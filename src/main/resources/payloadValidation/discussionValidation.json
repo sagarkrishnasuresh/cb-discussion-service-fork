@@ -4,7 +4,7 @@
   "properties": {
     "type": {
       "type": "string",
-      "enum": ["question", "feedback","blog","story","poll"]
+      "enum": ["question"]
     },
     "title": {
       "type": "string"
@@ -23,17 +23,12 @@
     },
     "targetTopic": {
       "type": "string"
-    },
-    "mediaUrls": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
     }
   },
   "required": [
     "type",
     "title",
     "communityId"
-  ]
+  ],
+    "additionalProperties": false
 }

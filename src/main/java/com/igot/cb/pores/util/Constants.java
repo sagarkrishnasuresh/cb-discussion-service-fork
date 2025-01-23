@@ -162,6 +162,8 @@ public class Constants {
     public static final String UPDATE_KEY = "update";
     public static final String SEARCHTAGS = "searchTags";
     public static final String INVALID_COMMUNITY_ID = "Invalid communityId";
+    public static final String COMMUNITY_ID = "communityId";
+    public static final String COMMUNITY_ID_CANNOT_BE_UPDATED = "communityId cannot be updated";
     private Constants() {
     }
 }
