@@ -164,6 +164,7 @@ public class Constants {
     public static final String INVALID_COMMUNITY_ID = "Invalid communityId";
     public static final String COMMUNITY_ID = "communityId";
     public static final String COMMUNITY_ID_CANNOT_BE_UPDATED = "communityId cannot be updated";
+    public static final String INVALID_DISCUSSION_ID = "Invalid discussionId";
     private Constants() {
     }
 }
