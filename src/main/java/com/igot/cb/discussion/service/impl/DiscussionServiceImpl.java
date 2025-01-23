@@ -11,7 +11,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.igot.cb.authentication.util.AccessTokenValidator;
+import com.igot.cb.discussion.entity.CommunityEntity;
 import com.igot.cb.discussion.entity.DiscussionEntity;
+import com.igot.cb.discussion.repository.CommunityEngagementRepository;
 import com.igot.cb.discussion.repository.DiscussionRepository;
 import com.igot.cb.discussion.service.DiscussionService;
 import com.igot.cb.metrics.service.ApiMetricsTracker;
@@ -71,6 +73,9 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private RedisTemplate<String, Object> redisTemp;
 
+    @Autowired
+    private CommunityEngagementRepository communityEngagementRepository;
+
     @PostConstruct
     public void init() {
         if (storageService == null) {
@@ -92,6 +97,12 @@ public class DiscussionServiceImpl implements DiscussionService {
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
             response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return response;
+        }
+        String communityId = discussionDetails.get("communityId").asText();
+        if(!validateCommunityId(communityId)){
+            response.getParams().setErrMsg(Constants.INVALID_COMMUNITY_ID);
             response.setResponseCode(HttpStatus.BAD_REQUEST);
             return response;
         }
@@ -117,8 +128,13 @@ public class DiscussionServiceImpl implements DiscussionService {
             DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.INSERT, postgresTime);
             ObjectMapper objectMapper = new ObjectMapper();
+            List<String> searchTags = new ArrayList<>();
+            searchTags.add(discussionDetails.get(Constants.TITLE).textValue().toLowerCase());
+            searchTags.add(discussionDetails.get(Constants.DESCRIPTION_PAYLOAD).textValue().toLowerCase());
+            ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
+            jsonNode.put(Constants.SEARCHTAGS, searchTagsArray);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
 
             response.setResponseCode(HttpStatus.CREATED);
@@ -238,11 +254,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNode.setAll((ObjectNode) data);
 
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            long esTime = System.currentTimeMillis();
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
-            updateMetricsDbOperation(Constants.DISCUSSION_UPDATE, Constants.ELASTICSEARCH, Constants.UPDATE_KEY, esTime);
-            Map<String, Object> responseMap = objectMapper.convertValue(discussionDbData, new TypeReference<Map<String, Object>>() {
+            CompletableFuture.runAsync(() -> {
+                esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             });
+            CompletableFuture.runAsync(() -> {cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), jsonNode);});
+            Map<String, Object> responseMap = objectMapper.convertValue(discussionDbData, new TypeReference<Map<String, Object>>() {});
             response.setResponseCode(HttpStatus.OK);
             response.setResult(responseMap);
             response.getParams().setStatus(Constants.SUCCESS);
@@ -262,7 +278,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
         updateMetricsApiCall(Constants.DISCUSSION_SEARCH);
         long redisTime = System.currentTimeMillis();
-        SearchResult searchResult = redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
+        SearchResult searchResult =redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
         updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, "search", redisTime);
         if (searchResult != null) {
             log.info("DiscussionServiceImpl::searchDiscussion:  search result fetched from redis");
@@ -271,7 +287,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
         String searchString = searchCriteria.getSearchString();
-        if (searchString != null && searchString.length() < 2) {
+        if (searchString != null && searchString.length() < 3) {
             createErrorResponse(response, Constants.MINIMUM_CHARACTERS_NEEDED, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
             return response;
         }
@@ -668,12 +684,9 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            long esTime = System.currentTimeMillis();
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
-            updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.INSERT, esTime);
-            long redisTimeData = System.currentTimeMillis();
-            cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
-            updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.INSERT, redisTimeData);
+            CompletableFuture.runAsync(() -> {esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());});
+            CompletableFuture.runAsync(() -> {cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);});
+
             updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
@@ -705,19 +718,15 @@ public class DiscussionServiceImpl implements DiscussionService {
             ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, 1);
         }
         discussionEntity.setData(data);
-        long postgresTime = System.currentTimeMillis();
         DiscussionEntity saveJsonEntity = discussionRepository.save(discussionEntity);
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.UPDATE_KEY, postgresTime);
         log.info("DiscussionService::updateAnswerPostToDiscussion: Discussion entity updated successfully");
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-        long esTime = System.currentTimeMillis();
-        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.ELASTICSEARCH, Constants.UPDATE_KEY, esTime);
-        long redisTime = System.currentTimeMillis();
-        cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.REDIS, Constants.INSERT, redisTime);
+        CompletableFuture.runAsync(() -> {
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+        });
+        CompletableFuture.runAsync(() -> {cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);});
     }
 
     @Override
@@ -915,5 +924,13 @@ public class DiscussionServiceImpl implements DiscussionService {
         } catch (Exception e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private boolean validateCommunityId(String communityId) {
+        Optional<CommunityEntity> communityEntityOptional = communityEngagementRepository.findByCommunityIdAndIsActive(communityId, true);
+        if (communityEntityOptional.isPresent()) {
+            return true;
+        }
+        return false;
     }
 }
