@@ -847,10 +847,13 @@ public class DiscussionServiceImpl implements DiscussionService {
 
 
     @Override
-    public ApiResponse uploadFile(MultipartFile mFile) {
+    public ApiResponse uploadFile(MultipartFile mFile, String communityId) {
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_UPLOAD_FILE);
         if(mFile.isEmpty()){
             return returnErrorMsg(Constants.DISCUSSION_FILE_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+        if(StringUtils.isBlank(communityId)){
+            return returnErrorMsg(Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
 
         File file = null;
@@ -862,8 +865,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             try (FileOutputStream fos = new FileOutputStream(file)) {
                 fos.write(mFile.getBytes());
             }
-            String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            String uploadFolderPath = cbServerProperties.getDiscussionCloudFolderName() + "/" + yearMonth;
+
+            String uploadFolderPath = cbServerProperties.getDiscussionCloudFolderName() + "/" + communityId;
             return uploadFile(file, uploadFolderPath, cbServerProperties.getDiscussionContainerName());
         } catch (Exception e) {
             log.error("Failed to upload file. Exception: ", e);
