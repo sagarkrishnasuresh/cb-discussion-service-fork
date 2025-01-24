@@ -28,5 +28,5 @@ public interface DiscussionService {
 
     ApiResponse report(String token, Map<String, Object> reportData);
 
-    ApiResponse uploadFile(MultipartFile file);
+    ApiResponse uploadFile(MultipartFile file,String communityId,String discussionId);
 }

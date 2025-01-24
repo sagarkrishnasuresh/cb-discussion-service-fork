@@ -5,6 +5,9 @@
     "discussionId": {
       "type": "string"
     },
+    "communityId": {
+      "type": "string"
+    },
     "type": {
       "type": "string",
       "enum": ["question", "feedback","blog","story","poll"]
@@ -32,6 +35,8 @@
     }
   },
   "required": [
-    "discussionId"
-  ]
+    "discussionId",
+    "communityId"
+  ],
+  "additionalProperties": false
 }

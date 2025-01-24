@@ -100,52 +100,49 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.setResponseCode(HttpStatus.BAD_REQUEST);
             return response;
         }
-        String communityId = discussionDetails.get("communityId").asText();
-        if(!validateCommunityId(communityId)){
+        if (!validateCommunityId(discussionDetails.get(Constants.COMMUNITY_ID).asText())) {
             response.getParams().setErrMsg(Constants.INVALID_COMMUNITY_ID);
             response.setResponseCode(HttpStatus.BAD_REQUEST);
             return response;
         }
         updateMetricsApiCall(Constants.DISCUSSION_CREATE);
         try {
-            ((ObjectNode) discussionDetails).put(Constants.CREATED_BY, userId);
-            ((ObjectNode) discussionDetails).put(Constants.UP_VOTE_COUNT, 0L);
-            ((ObjectNode) discussionDetails).put(Constants.DOWN_VOTE_COUNT, 0L);
-            ((ObjectNode) discussionDetails).put(Constants.MEDIA, discussionDetails.get(Constants.MEDIA));
-            ((ObjectNode) discussionDetails).put(Constants.STATUS, Constants.ACTIVE);
+            ObjectNode discussionDetailsNode = (ObjectNode) discussionDetails;
+            discussionDetailsNode.put(Constants.CREATED_BY, userId);
+            discussionDetailsNode.put(Constants.UP_VOTE_COUNT, 0L);
+            discussionDetailsNode.put(Constants.DOWN_VOTE_COUNT, 0L);
+            discussionDetailsNode.put(Constants.STATUS, Constants.ACTIVE);
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            long currentTimeMillis = System.currentTimeMillis();
+            Timestamp currentTime = new Timestamp(currentTimeMillis);
             UUID id = UUIDs.timeBased();
-            ((ObjectNode) discussionDetails).put(Constants.DISCUSSION_ID, String.valueOf(id));
+            discussionDetailsNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
-            ((ObjectNode) discussionDetails).put(Constants.CREATED_ON, currentTime.toString());
+            discussionDetailsNode.put(Constants.CREATED_ON, currentTime.toString());
             jsonNodeEntity.setIsActive(true);
-            ((ObjectNode) discussionDetails).put(Constants.IS_ACTIVE, true);
-            jsonNodeEntity.setData(discussionDetails);
+            discussionDetailsNode.put(Constants.IS_ACTIVE, true);
+            jsonNodeEntity.setData(discussionDetailsNode);
             long postgresTime = System.currentTimeMillis();
             DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.INSERT, postgresTime);
-            ObjectMapper objectMapper = new ObjectMapper();
-            List<String> searchTags = new ArrayList<>();
-            searchTags.add(discussionDetails.get(Constants.TITLE).textValue().toLowerCase());
-            searchTags.add(discussionDetails.get(Constants.DESCRIPTION_PAYLOAD).textValue().toLowerCase());
+
+            List<String> searchTags = Arrays.asList(
+                    discussionDetails.get(Constants.TITLE).textValue().toLowerCase(),
+                    discussionDetails.get(Constants.DESCRIPTION_PAYLOAD).textValue().toLowerCase()
+            );
             ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
             ObjectNode jsonNode = objectMapper.createObjectNode();
-            jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
+            jsonNode.setAll(discussionDetailsNode);
             jsonNode.put(Constants.SEARCHTAGS, searchTagsArray);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
 
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
-            CompletableFuture.runAsync(() -> {
-                updateElasticsearch(saveJsonEntity.getDiscussionId(),map);
-            });
-            CompletableFuture.runAsync(() -> {
-                updateRedis(saveJsonEntity.getDiscussionId(),jsonNode);
-            });
+            CompletableFuture.runAsync(() -> updateElasticsearch(saveJsonEntity.getDiscussionId(), map));
+            CompletableFuture.runAsync(() -> updateRedis(saveJsonEntity.getDiscussionId(), jsonNode));
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -218,7 +215,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Override
     public ApiResponse updateDiscussion(JsonNode updateData, String token) {
         ApiMetricsTracker.enableTracking();
-        ApiResponse response = ProjectUtil.createDefaultResponse("upate.Discussion");
+        ApiResponse response = ProjectUtil.createDefaultResponse("update.Discussion");
         try {
             payloadValidation.validatePayload(Constants.DISCUSSION_UPDATE_VALIDATION_FILE, updateData);
             updateMetricsApiCall(Constants.DISCUSSION_UPDATE);
@@ -235,29 +232,34 @@ public class DiscussionServiceImpl implements DiscussionService {
                 createErrorResponse(response, Constants.DISCUSSION_IS_NOT_ACTIVE, HttpStatus.BAD_REQUEST, Constants.FAILED);
                 return response;
             }
-            JsonNode data = discussionDbData.getData();
-            List<String> updateFields = Arrays.asList(Constants.TYPE, Constants.TITLE, Constants.DESCRIPTION_PAYLOAD, Constants.TARGET_TOPIC, Constants.TAGS);
-            for (String field : updateFields) {
-                if (updateData.has(field)) {
-                    ((ObjectNode) data).put(field, updateData.get(field).asText());
-                }
+            ObjectNode data = (ObjectNode) discussionDbData.getData();
+            ObjectNode updateDataNode = (ObjectNode) updateData;
+            if(data.get(Constants.COMMUNITY_ID) != null && !data.get(Constants.COMMUNITY_ID).asText().equals(updateDataNode.get(Constants.COMMUNITY_ID).asText())) {
+                createErrorResponse(response, Constants.COMMUNITY_ID_CANNOT_BE_UPDATED, HttpStatus.BAD_REQUEST, Constants.FAILED);
+                return response;
             }
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            ((ObjectNode) data).put(Constants.UPDATED_ON, String.valueOf(currentTime));
+            updateDataNode.remove(Constants.COMMUNITY_ID);
+            updateDataNode.remove(Constants.DISCUSSION_ID);
+            data.setAll(updateDataNode);
+
+            long currentTimeMillis = System.currentTimeMillis();
+            Timestamp currentTime = new Timestamp(currentTimeMillis);
+            data.put(Constants.UPDATED_ON, String.valueOf(currentTime));
             discussionDbData.setUpdatedOn(currentTime);
             discussionDbData.setData(data);
             long postgresInsertTime = System.currentTimeMillis();
             discussionRepository.save(discussionDbData);
             updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.UPDATE_KEY, postgresInsertTime);
             ObjectNode jsonNode = objectMapper.createObjectNode();
-            jsonNode.set(Constants.DISCUSSION_ID, new TextNode(discussionDbData.getDiscussionId()));
-            jsonNode.setAll((ObjectNode) data);
+            jsonNode.setAll(data);
 
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             CompletableFuture.runAsync(() -> {
                 esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             });
-            CompletableFuture.runAsync(() -> {cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), jsonNode);});
+            CompletableFuture.runAsync(() -> {
+                cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), jsonNode);
+            });
             Map<String, Object> responseMap = objectMapper.convertValue(discussionDbData, new TypeReference<Map<String, Object>>() {});
             response.setResponseCode(HttpStatus.OK);
             response.setResult(responseMap);
@@ -287,7 +289,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
         String searchString = searchCriteria.getSearchString();
-        if (searchString != null && searchString.length() < 3) {
+        if (searchString != null && !searchString.isEmpty() && searchString.length() < 3) {
             createErrorResponse(response, Constants.MINIMUM_CHARACTERS_NEEDED, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
             return response;
         }
@@ -845,10 +847,16 @@ public class DiscussionServiceImpl implements DiscussionService {
 
 
     @Override
-    public ApiResponse uploadFile(MultipartFile mFile) {
+    public ApiResponse uploadFile(MultipartFile mFile, String communityId,String discussionId) {
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_UPLOAD_FILE);
         if(mFile.isEmpty()){
             return returnErrorMsg(Constants.DISCUSSION_FILE_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+        if(StringUtils.isBlank(discussionId)){
+            return returnErrorMsg(Constants.INVALID_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+        if(StringUtils.isBlank(communityId)){
+            return returnErrorMsg(Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
 
         File file = null;
@@ -860,8 +868,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             try (FileOutputStream fos = new FileOutputStream(file)) {
                 fos.write(mFile.getBytes());
             }
-            String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            String uploadFolderPath = cbServerProperties.getDiscussionCloudFolderName() + "/" + yearMonth;
+
+            String uploadFolderPath = cbServerProperties.getDiscussionCloudFolderName() + "/" + communityId + "/" + discussionId;
             return uploadFile(file, uploadFolderPath, cbServerProperties.getDiscussionContainerName());
         } catch (Exception e) {
             log.error("Failed to upload file. Exception: ", e);
