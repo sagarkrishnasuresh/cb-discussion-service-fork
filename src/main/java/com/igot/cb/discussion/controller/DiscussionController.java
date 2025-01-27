@@ -80,11 +80,11 @@ public class DiscussionController {
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @PostMapping("/fileUpload")
+    @PostMapping("/fileUpload/{communityId}/{discussionId}")
     public ResponseEntity<ApiResponse> uploadFile(
             @RequestParam(value = "file", required = true) MultipartFile multipartFile,
-            @RequestParam(value = "communityId", required = true) String communityId,
-            @RequestParam(value = "discussionId", required = true) String discussionId)  {
+            @PathVariable(value = "communityId", required = true) String communityId,
+            @PathVariable(value = "discussionId", required = true) String discussionId)  {
         ApiResponse uploadResponse = discussionService.uploadFile(multipartFile, communityId,discussionId);
         return new ResponseEntity<>(uploadResponse, uploadResponse.getResponseCode());
     }
