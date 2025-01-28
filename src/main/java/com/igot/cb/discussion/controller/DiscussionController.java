@@ -88,4 +88,11 @@ public class DiscussionController {
         ApiResponse uploadResponse = discussionService.uploadFile(multipartFile, communityId,discussionId);
         return new ResponseEntity<>(uploadResponse, uploadResponse.getResponseCode());
     }
+
+    @PostMapping("/updateAnswerPost")
+    public ResponseEntity<ApiResponse> updateAnswerPost(@RequestBody JsonNode updateData,
+                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
+        ApiResponse response = discussionService.updateAnswerPost(updateData,token);
+        return new ResponseEntity<>(response,response.getResponseCode());
+    }
 }

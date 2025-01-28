@@ -165,6 +165,10 @@ public class Constants {
     public static final String COMMUNITY_ID = "communityId";
     public static final String COMMUNITY_ID_CANNOT_BE_UPDATED = "communityId cannot be updated";
     public static final String INVALID_DISCUSSION_ID = "Invalid discussionId";
+    public static final String ANSWER_POST_ID = "answerPostId";
+    public static final String INVALID_ANSWER_POST_ID = "Invalid answerPostId";
+    public static final String FAILED_TO_UPDATE_ANSWER_POST = "Failed to update the answer post";
+    public static final String ANSWER_POST_UPDATE_VALIDATION_FILE = "/payloadValidation/answerPostUpdateValidation.json";
     private Constants() {
     }
 }

@@ -646,50 +646,50 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
         updateMetricsApiCall(Constants.DISCUSSION_ANSWER_POST);
-        long redisTimer = System.currentTimeMillis();
+        long postgresTime = System.currentTimeMillis();
         DiscussionEntity discussionEntity = discussionRepository.findById(answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()).orElse(null);
-        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.READ, redisTimer);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.READ, postgresTime);
         if (discussionEntity == null || !discussionEntity.getIsActive()) {
-            returnErrorMsg(Constants.INVALID_PARENT_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
-            return response;
+            return returnErrorMsg(Constants.INVALID_PARENT_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
         JsonNode data = discussionEntity.getData();
         String type = data.get(Constants.TYPE).asText();
         if (type.equals(Constants.ANSWER_POST)) {
-            returnErrorMsg(Constants.PARENT_ANSWER_POST_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
-            return response;
+            return returnErrorMsg(Constants.PARENT_ANSWER_POST_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
         if (data.get(Constants.STATUS).asText().equals(Constants.SUSPENDED)) {
-            returnErrorMsg(Constants.PARENT_DISCUSSION_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
-            return response;
+            return returnErrorMsg(Constants.PARENT_DISCUSSION_ID_ERROR, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
 
         try {
-            ((ObjectNode) answerPostData).put(Constants.CREATED_BY, userId);
-            ((ObjectNode) answerPostData).put(Constants.VOTE_COUNT, 0);
-            ((ObjectNode) answerPostData).put(Constants.MEDIA, answerPostData.get(Constants.MEDIA));
-            ((ObjectNode) answerPostData).put(Constants.PARENT_DISCUSSION_ID, answerPostData.get(Constants.PARENT_DISCUSSION_ID));
+            ObjectNode answerPostDataNode = (ObjectNode) answerPostData;
+            answerPostDataNode.put(Constants.CREATED_BY, userId);
+            answerPostDataNode.put(Constants.VOTE_COUNT, 0);
+            answerPostDataNode.put(Constants.STATUS, Constants.ACTIVE);
+            answerPostDataNode.put(Constants.PARENT_DISCUSSION_ID, answerPostData.get(Constants.PARENT_DISCUSSION_ID));
+
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            long currentTimeMillis = System.currentTimeMillis();
+            Timestamp currentTime = new Timestamp(currentTimeMillis);
             UUID id = UUIDs.timeBased();
-            ((ObjectNode) answerPostData).put(Constants.DISCUSSION_ID, String.valueOf(id));
+            answerPostDataNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
-            ((ObjectNode) answerPostData).put(Constants.CREATED_ON, currentTime.toString());
+            answerPostDataNode.put(Constants.CREATED_ON, currentTime.toString());
             jsonNodeEntity.setIsActive(true);
-            ((ObjectNode) answerPostData).put(Constants.IS_ACTIVE, true);
-            jsonNodeEntity.setData(answerPostData);
+            answerPostDataNode.put(Constants.IS_ACTIVE, true);
+            jsonNodeEntity.setData(answerPostDataNode);
             long timer = System.currentTimeMillis();
-            DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
+            discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.INSERT, timer);
-            ObjectMapper objectMapper = new ObjectMapper();
-            ObjectNode jsonNode = objectMapper.createObjectNode();
-            jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            CompletableFuture.runAsync(() -> {esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());});
-            CompletableFuture.runAsync(() -> {cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);});
 
-            updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
+            ObjectNode jsonNode = objectMapper.createObjectNode();
+            jsonNode.setAll(answerPostDataNode);
+            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            CompletableFuture.runAsync(() -> esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath()));
+            CompletableFuture.runAsync(() -> cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode));
+
+            updateAnswerPostToDiscussion(discussionEntity, discussionEntity.getDiscussionId());
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
@@ -705,30 +705,28 @@ public class DiscussionServiceImpl implements DiscussionService {
 
     private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId) {
         JsonNode data = discussionEntity.getData();
+        Set<String> answerPostSet = new HashSet<>();
+
         if (data.has(Constants.ANSWER_POSTS)) {
-            Set<String> answerPostSet = new HashSet<>();
             ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
             existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
-            answerPostSet.add(discussionId);
-            ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
-            ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
-            ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, answerPostSet.size());
-        } else {
-            ArrayNode arrayNode = objectMapper.createArrayNode();
-            arrayNode.add(discussionId);
-            ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
-            ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, 1);
         }
+
+        answerPostSet.add(discussionId);
+        ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
+        ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
+        ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, answerPostSet.size());
+
         discussionEntity.setData(data);
-        DiscussionEntity saveJsonEntity = discussionRepository.save(discussionEntity);
+        DiscussionEntity savedEntity = discussionRepository.save(discussionEntity);
         log.info("DiscussionService::updateAnswerPostToDiscussion: Discussion entity updated successfully");
+
         ObjectNode jsonNode = objectMapper.createObjectNode();
-        jsonNode.setAll((ObjectNode) saveJsonEntity.getData());
+        jsonNode.setAll((ObjectNode) savedEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-        CompletableFuture.runAsync(() -> {
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
-        });
-        CompletableFuture.runAsync(() -> {cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);});
+
+        CompletableFuture.runAsync(() -> esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath()));
+        CompletableFuture.runAsync(() -> cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode));
     }
 
     @Override
@@ -940,5 +938,63 @@ public class DiscussionServiceImpl implements DiscussionService {
             return true;
         }
         return false;
+    }
+    @Override
+    public ApiResponse updateAnswerPost(JsonNode answerPostData, String token) {
+        log.info("DiscussionService::updateAnswerPost:updating answerPost");
+        ApiResponse response = ProjectUtil.createDefaultResponse("discussion.updateAnswerPost");
+        payloadValidation.validatePayload(Constants.ANSWER_POST_UPDATE_VALIDATION_FILE, answerPostData);
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
+            response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return response;
+        }
+        updateMetricsApiCall(Constants.DISCUSSION_ANSWER_POST);
+        long redisTimer = System.currentTimeMillis();
+        DiscussionEntity discussionEntity = discussionRepository.findById(answerPostData.get(Constants.ANSWER_POST_ID).asText()).orElse(null);
+        updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.READ, redisTimer);
+        if (discussionEntity == null || !discussionEntity.getIsActive()) {
+            return returnErrorMsg(Constants.INVALID_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+        JsonNode data = discussionEntity.getData();
+        String type = data.get(Constants.TYPE).asText();
+        if (!type.equals(Constants.ANSWER_POST)) {
+            return returnErrorMsg(Constants.INVALID_ANSWER_POST_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+        if (data.get(Constants.STATUS).asText().equals(Constants.SUSPENDED)) {
+            return returnErrorMsg(Constants.DISCUSSION_SUSPENDED, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+
+        try {
+            ObjectNode answerPostDataNode = (ObjectNode) answerPostData;
+            answerPostDataNode.remove(Constants.ANSWER_POST_ID);
+            //answerPostDataNode.put("updatedBy", userId);
+            long currentTimeMillis = System.currentTimeMillis();
+            Timestamp currentTime = new Timestamp(currentTimeMillis);
+            answerPostDataNode.put(Constants.UPDATED_ON, currentTime.toString());
+            discussionEntity.setUpdatedOn(currentTime);
+            ((ObjectNode) data).setAll(answerPostDataNode);
+            discussionEntity.setData(data);
+            long timer = System.currentTimeMillis();
+            discussionRepository.save(discussionEntity);
+            updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.UPDATE, timer);
+
+            ObjectNode jsonNode = objectMapper.createObjectNode();
+            jsonNode.setAll(answerPostDataNode);
+            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            CompletableFuture.runAsync(() -> esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath()));
+            CompletableFuture.runAsync(() -> cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(discussionEntity.getDiscussionId()), jsonNode));
+
+            log.info("AnswerPost updated successfully");
+            response.setResponseCode(HttpStatus.OK);
+            response.getParams().setStatus(Constants.SUCCESS);
+            response.setResult(map);
+        } catch (Exception e) {
+            log.error("Failed to update AnswerPost: {}", e.getMessage(), e);
+            createErrorResponse(response, Constants.FAILED_TO_UPDATE_ANSWER_POST, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
+            return response;
+        }
+        return response;
     }
 }
