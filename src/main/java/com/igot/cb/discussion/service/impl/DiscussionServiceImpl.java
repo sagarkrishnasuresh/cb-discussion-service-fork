@@ -689,7 +689,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             CompletableFuture.runAsync(() -> esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath()));
             CompletableFuture.runAsync(() -> cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode));
 
-            updateAnswerPostToDiscussion(discussionEntity, discussionEntity.getDiscussionId());
+            updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
