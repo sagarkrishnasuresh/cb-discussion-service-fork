@@ -826,13 +826,13 @@ public class DiscussionServiceImpl implements DiscussionService {
                     Constants.KEYSPACE_SUNBIRD, Constants.POST_REPORTED_BY_USER, Collections.singletonMap(Constants.DISCUSSION_ID, discussionId), null, null);
 
             int reportCount = reportedByUsers.size();
-            String status = reportCount >=  cbServerProperties.getReportPostUserLimit() ? Constants.SUSPENDED : Constants.REPORTED;
+            String status = reportCount >= cbServerProperties.getReportPostUserLimit() ? Constants.SUSPENDED : Constants.REPORTED;
 
             Map<String, Object> statusUpdateData = new HashMap<>();
             statusUpdateData.put(Constants.STATUS, status);
             ObjectNode jsonNode = objectMapper.createObjectNode();
 
-            if(!data.get(Constants.STATUS).textValue().equals(status)){
+            if (!data.get(Constants.STATUS).textValue().equals(status)) {
                 data.put(Constants.STATUS, status);
                 discussionRepository.save(discussionEntity);
             }
