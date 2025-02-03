@@ -40,9 +40,6 @@ public class CbServerProperties {
   @Value("${cloud.storage.endpoint}")
   private String cloudStorageEndpoint;
 
-  @Value("${discussion.answer.post.entity}")
-  private String discussionAnswerPostEntity;
-
   @Value("${report.post.user.limit}")
   private int reportPostUserLimit;
 
