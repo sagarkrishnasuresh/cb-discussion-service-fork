@@ -51,4 +51,6 @@ public interface CassandraOperation {
      */
     Map<String, Object> updateRecordByCompositeKey(String keyspaceName, String tableName, Map<String, Object> updateAttributes,
                                                    Map<String, Object> compositeKey);
+
+    public void deleteRecord(String keyspaceName, String tableName, Map<String, Object> keyMap);
 }

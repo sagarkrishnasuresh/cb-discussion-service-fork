@@ -169,6 +169,22 @@ public class Constants {
     public static final String INVALID_ANSWER_POST_ID = "Invalid answerPostId";
     public static final String FAILED_TO_UPDATE_ANSWER_POST = "Failed to update the answer post";
     public static final String ANSWER_POST_UPDATE_VALIDATION_FILE = "/payloadValidation/answerPostUpdateValidation.json";
+    public static final String USER_COMMUNITY = "user_community";
+    public static final String USER_NOT_PART_OF_COMMUNITY = "User is not part of the community";
+    public static final String DISCUSSION_BOOKMARKS = "user_post_bookmarks";
+    public static final String ALREADY_BOOKMARKED = "Already bookmarked";
+    public static final String DISCUSSION_BOOKMARK_FAILED = "Failed to bookmark the post";
+    public static final String DISCUSSION_UN_BOOKMARK_FAILED = "Failed to unBookmark the post";
+    public static final String NO_DISCUSSIONS_FOUND = "No discussions found";
+    public static final String DISCUSSION_BOOKMARK_FETCH_FAILED = "Failed to fetch bookmarked discussions";
+    public static final String DISCUSSIONS = "discussions";
+    public static final String FILES = "files";
+    public static final String DISCUSSION_UPLOAD_FILE_FETCH_FAILED = "Failed to fetch uploaded files";
+    public static final String USER_REPORTED_POSTS= "user_reported_posts";
+    public static final String POST_REPORTED_BY_USER = "post_reportedby_user";
+    public static final String REASON = "reason";
+    public static final String REPORTED = "reported";
+
     private Constants() {
     }
 }

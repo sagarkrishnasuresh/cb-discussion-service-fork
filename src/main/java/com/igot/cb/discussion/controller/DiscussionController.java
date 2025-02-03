@@ -95,4 +95,24 @@ public class DiscussionController {
         ApiResponse response = discussionService.updateAnswerPost(updateData,token);
         return new ResponseEntity<>(response,response.getResponseCode());
     }
+
+    @GetMapping("bookmark/{communityId}/{discussionId}")
+    public ResponseEntity<ApiResponse> bookmarkDiscussion(@PathVariable String communityId, @PathVariable String discussionId,
+                                                          @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.bookmarkDiscussion(token, communityId, discussionId);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("unBookmark/{communityId}/{discussionId}")
+    public ResponseEntity<ApiResponse> unBookmarkDiscussion(@PathVariable String communityId, @PathVariable String discussionId,
+                                                           @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.unBookmarkDiscussion(communityId, discussionId, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @GetMapping("bookmarkedDiscussions/{communityId}")
+    public ResponseEntity<ApiResponse> getBookmarkedDiscussions(@PathVariable String communityId, @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.getBookmarkedDiscussions(token, communityId);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
 }

@@ -3,9 +3,7 @@ package com.igot.cb.transactional.cassandrautils;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.querybuilder.Clause;
-import com.datastax.driver.core.querybuilder.QueryBuilder;
-import com.datastax.driver.core.querybuilder.Select;
+import com.datastax.driver.core.querybuilder.*;
 import com.datastax.driver.core.querybuilder.Select.Builder;
 import com.datastax.driver.core.querybuilder.Select.Where;
 import com.igot.cb.pores.util.ApiResponse;
@@ -17,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.datastax.driver.core.*;
-import com.datastax.driver.core.querybuilder.Update;
 
 import java.text.MessageFormat;
 import java.util.*;
@@ -254,5 +251,23 @@ public class CassandraOperationImpl implements CassandraOperation {
             throw e;
         }
         return response;
+    }
+
+    @Override
+    public void deleteRecord(String keyspaceName, String tableName, Map<String, Object> compositeKeyMap) {
+        Delete delete = null;
+        try {
+            delete = QueryBuilder.delete().from(keyspaceName, tableName);
+            Delete.Where deleteWhere = delete.where();
+            compositeKeyMap.entrySet().stream().forEach(x -> {
+                Clause clause = QueryBuilder.eq(x.getKey(), x.getValue());
+                deleteWhere.and(clause);
+            });
+            connectionManager.getSession(keyspaceName).execute(delete);
+        } catch (Exception e) {
+            logger.error(String.format("CassandraOperationImpl: deleteRecord by composite key. %s %s %s",
+                    Constants.EXCEPTION_MSG_DELETE, tableName, e.getMessage()));
+            throw e;
+        }
     }
 }

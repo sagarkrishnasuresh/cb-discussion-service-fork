@@ -14,17 +14,11 @@
   "description": {
     "type": "keyword"
   },
-  "tags": {
-    "type": "keyword"
-  },
   "createdBy": {
   "type": "keyword"
   },
   "isActive": {
     "type": "boolean"
-  },
-  "targetTopic": {
-    "type": "keyword"
   },
   "upVoteCount": {
     "type": "number"
