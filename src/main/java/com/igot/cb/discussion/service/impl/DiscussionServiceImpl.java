@@ -100,7 +100,6 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.setResponseCode(HttpStatus.BAD_REQUEST);
             return response;
         }
-
         if (!validateCommunityId(discussionDetails.get(Constants.COMMUNITY_ID).asText())) {
             response.getParams().setErrMsg(Constants.INVALID_COMMUNITY_ID);
             response.setResponseCode(HttpStatus.BAD_REQUEST);
