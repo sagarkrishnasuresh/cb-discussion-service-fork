@@ -648,7 +648,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         log.info("DiscussionService::createAnswerPost:creating answerPost");
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.createAnswerPost");
         payloadValidation.validatePayload(Constants.DISCUSSION_ANSWER_POST_VALIDATION_FILE, answerPostData);
-        String userId = "81d810fd-61ee-4f46-b4eb-ae039827d95a";  //accessTokenValidator.verifyUserToken(token);
+        String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
             response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
             response.setResponseCode(HttpStatus.BAD_REQUEST);
