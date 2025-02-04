@@ -81,7 +81,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private Producer producer;
 
-    @Value("${kafka.topic.discusion.post.count}")
+    @Value("${kafka.topic.community.discusion.post.count}")
     private String communityPostCount;
 
     @PostConstruct
