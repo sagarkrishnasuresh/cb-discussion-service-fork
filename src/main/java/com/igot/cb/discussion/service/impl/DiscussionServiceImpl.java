@@ -76,7 +76,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private CommunityEngagementRepository communityEngagementRepository;
 
-    @PostConstruct
+    //@PostConstruct
     public void init() {
         if (storageService == null) {
             storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
@@ -1128,22 +1128,18 @@ public class DiscussionServiceImpl implements DiscussionService {
     }
 
     @Override
-    public ApiResponse getBookmarkedDiscussions(String token, String communityId) {
+    public ApiResponse getBookmarkedDiscussions(String token) {
         log.info("DiscussionService::getBookmarkedDiscussions: Fetching bookmarked discussions");
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.getBookmarkedDiscussions");
+
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
             return returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
         }
 
-        if (StringUtils.isBlank(communityId)) {
-            return returnErrorMsg(Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
-        }
-
         try {
             Map<String, Object> properties = new HashMap<>();
             properties.put(Constants.USERID, userId);
-            properties.put(Constants.COMMUNITY_ID, communityId);
             List<Map<String, Object>> bookmarkedDiscussions = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
                     Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.DISCUSSION_ID), null);
 

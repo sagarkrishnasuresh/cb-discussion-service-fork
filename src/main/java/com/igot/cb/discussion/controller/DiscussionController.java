@@ -110,9 +110,9 @@ public class DiscussionController {
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @GetMapping("bookmarkedDiscussions/{communityId}")
-    public ResponseEntity<ApiResponse> getBookmarkedDiscussions(@PathVariable String communityId, @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-        ApiResponse response = discussionService.getBookmarkedDiscussions(token, communityId);
+    @GetMapping("bookmarkedDiscussions")
+    public ResponseEntity<ApiResponse> getBookmarkedDiscussions(@RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.getBookmarkedDiscussions(token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 }

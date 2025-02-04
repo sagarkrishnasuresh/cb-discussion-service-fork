@@ -36,5 +36,5 @@ public interface DiscussionService {
 
     ApiResponse unBookmarkDiscussion(String communityId, String discussionId, String token);
 
-    ApiResponse getBookmarkedDiscussions(String token, String communityId);
+    ApiResponse getBookmarkedDiscussions(String token);
 }
