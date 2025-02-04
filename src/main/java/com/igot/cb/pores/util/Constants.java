@@ -169,6 +169,9 @@ public class Constants {
     public static final String INVALID_ANSWER_POST_ID = "Invalid answerPostId";
     public static final String FAILED_TO_UPDATE_ANSWER_POST = "Failed to update the answer post";
     public static final String ANSWER_POST_UPDATE_VALIDATION_FILE = "/payloadValidation/answerPostUpdateValidation.json";
+    public static final String INCREMENT = "increment";
+    public static final String DECREMENT = "decrement";
+    public static final String POST = "post";
     public static final String USER_COMMUNITY = "user_community";
     public static final String USER_NOT_PART_OF_COMMUNITY = "User is not part of the community";
     public static final String DISCUSSION_BOOKMARKS = "user_post_bookmarks";

@@ -22,11 +22,13 @@ import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.elasticsearch.dto.SearchResult;
 import com.igot.cb.pores.elasticsearch.service.EsUtilService;
 import com.igot.cb.pores.util.*;
+import com.igot.cb.producer.Producer;
 import com.igot.cb.transactional.cassandrautils.CassandraOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -76,7 +78,13 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private CommunityEngagementRepository communityEngagementRepository;
 
-    //@PostConstruct
+    @Autowired
+    private Producer producer;
+
+    @Value("${kafka.topic.community.discusion.post.count}")
+    private String communityPostCount;
+
+    @PostConstruct
     public void init() {
         if (storageService == null) {
             storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
@@ -151,6 +159,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.setResult(map);
             CompletableFuture.runAsync(() -> updateElasticsearch(saveJsonEntity.getDiscussionId(), map));
             CompletableFuture.runAsync(() -> updateRedis(saveJsonEntity.getDiscussionId(), jsonNode));
+            Map<String, String> communityObject = new HashMap<>();
+            communityObject.put(Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText());
+            communityObject.put(Constants.STATUS, Constants.INCREMENT);
+            communityObject.put(Constants.TYPE, Constants.POST);
+            producer.push(communityPostCount, communityObject);
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -408,6 +421,10 @@ public class DiscussionServiceImpl implements DiscussionService {
                         response.setResponseCode(HttpStatus.OK);
                         response.setMessage(Constants.DELETED_SUCCESSFULLY);
                         response.getParams().setStatus(Constants.SUCCESS);
+                        Map<String, String> communityObject = new HashMap<>();
+                        communityObject.put(Constants.COMMUNITY_ID, entityOptional.get().getDiscussionId());
+                        communityObject.put(Constants.STATUS, Constants.INCREMENT);
+                        producer.push(communityPostCount, communityObject);
                         return response;
                     } else {
                         log.info("Discussion is already inactive.");
