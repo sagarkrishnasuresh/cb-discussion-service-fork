@@ -11,10 +11,27 @@
     "description": {
       "type": "string"
     },
-    "mediaUrls": {
-      "type": "array",
-      "items": {
-        "type": "string"
+    "mediaCategory": {
+      "type": "object",
+      "properties": {
+        "docs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     }
   },
