@@ -1094,14 +1094,15 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             // Check if the bookmark already exists
             List<Map<String, Object>> existingBookmarks = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-                    Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, null, null);
+                    Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.STATUS), null);
 
-            if (!existingBookmarks.isEmpty()) {
-                return returnErrorMsg(Constants.ALREADY_BOOKMARKED, HttpStatus.CONFLICT, response, Constants.FAILED);
+            if (!existingBookmarks.isEmpty() && (boolean)existingBookmarks.get(0).get(Constants.STATUS)) {
+                return returnErrorMsg(Constants.ALREADY_BOOKMARKED, HttpStatus.OK, response, Constants.FAILED);
             }
 
             // Insert the new bookmark
             properties.put(Constants.CREATED_ON, new Timestamp(System.currentTimeMillis()));
+            properties.put(Constants.STATUS, true);
             cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties);
 
             Map<String, Object> map = new HashMap<>();
@@ -1131,46 +1132,19 @@ public class DiscussionServiceImpl implements DiscussionService {
             return returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
         }
 
-        Map<String, Object> bookmarkData = new HashMap<>();
-        bookmarkData.put(Constants.COMMUNITY_ID, communityId);
-        bookmarkData.put(Constants.DISCUSSION_ID, discussionId);
-        bookmarkData.put(Constants.USERID, userId);
+        Map<String, Object> compositeKeys = new HashMap<>();
+        Map<String, Object> properties = new HashMap<>();
+        compositeKeys.put(Constants.COMMUNITY_ID, communityId);
+        compositeKeys.put(Constants.DISCUSSION_ID, discussionId);
+        compositeKeys.put(Constants.USERID, userId);
+        properties.put(Constants.STATUS, false);
+
         try {
-            cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, bookmarkData);
+            cassandraOperation.updateRecordByCompositeKey(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties,compositeKeys);
             return response;
         } catch (Exception e) {
             log.error("DiscussionService::unBookmarkDiscussion: Failed to unBookmark discussion", e);
             return returnErrorMsg(Constants.DISCUSSION_UN_BOOKMARK_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
-        }
-    }
-
-    @Override
-    public ApiResponse getBookmarkedDiscussions(String token) {
-        log.info("DiscussionService::getBookmarkedDiscussions: Fetching bookmarked discussions");
-        ApiResponse response = ProjectUtil.createDefaultResponse("discussion.getBookmarkedDiscussions");
-
-        String userId = accessTokenValidator.verifyUserToken(token);
-        if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
-            return returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
-        }
-
-        try {
-            Map<String, Object> properties = new HashMap<>();
-            properties.put(Constants.USERID, userId);
-            List<Map<String, Object>> bookmarkedDiscussions = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-                    Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.DISCUSSION_ID), null);
-
-            if (bookmarkedDiscussions.isEmpty()) {
-                return returnErrorMsg(Constants.NO_DISCUSSIONS_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
-            }
-
-            Map<String, Object> discussions = new HashMap<>();
-            discussions.put(Constants.DISCUSSIONS, bookmarkedDiscussions);
-            response.setResult(discussions);
-            return response;
-        } catch (Exception e) {
-            log.error("DiscussionService::getBookmarkedDiscussions: Failed to fetch bookmarked discussions", e);
-            return returnErrorMsg(Constants.DISCUSSION_BOOKMARK_FETCH_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
         }
     }
 }

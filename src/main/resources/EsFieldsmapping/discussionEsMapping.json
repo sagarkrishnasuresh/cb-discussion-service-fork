@@ -57,5 +57,18 @@
   },
   "searchTags": {
     "type": "keyword"
+  },
+  "mediaCategory": {
+    "properties": {
+      "docs": {
+        "type": "keyword"
+      },
+      "links": {
+        "type": "keyword"
+      },
+      "media": {
+        "type": "keyword"
+      }
+    }
   }
 }
