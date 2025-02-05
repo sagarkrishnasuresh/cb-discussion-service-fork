@@ -252,22 +252,4 @@ public class CassandraOperationImpl implements CassandraOperation {
         }
         return response;
     }
-
-    @Override
-    public void deleteRecord(String keyspaceName, String tableName, Map<String, Object> compositeKeyMap) {
-        Delete delete = null;
-        try {
-            delete = QueryBuilder.delete().from(keyspaceName, tableName);
-            Delete.Where deleteWhere = delete.where();
-            compositeKeyMap.entrySet().stream().forEach(x -> {
-                Clause clause = QueryBuilder.eq(x.getKey(), x.getValue());
-                deleteWhere.and(clause);
-            });
-            connectionManager.getSession(keyspaceName).execute(delete);
-        } catch (Exception e) {
-            logger.error(String.format("CassandraOperationImpl: deleteRecord by composite key. %s %s %s",
-                    Constants.EXCEPTION_MSG_DELETE, tableName, e.getMessage()));
-            throw e;
-        }
-    }
 }
