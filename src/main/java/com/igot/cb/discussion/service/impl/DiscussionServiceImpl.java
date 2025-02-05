@@ -1065,7 +1065,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
 
         if (StringUtils.isBlank(communityId)) {
-            return returnErrorMsg(Constants.INVALID_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return returnErrorMsg(Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
@@ -1125,7 +1125,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
 
         if (StringUtils.isBlank(communityId)) {
-            return returnErrorMsg(Constants.INVALID_DISCUSSION_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return returnErrorMsg(Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
