@@ -31,4 +31,8 @@ public interface DiscussionService {
     ApiResponse uploadFile(MultipartFile file,String communityId,String discussionId);
 
     ApiResponse updateAnswerPost(JsonNode updateData,String token);
+
+    ApiResponse bookmarkDiscussion(String token, String communityId, String discussionId);
+
+    ApiResponse unBookmarkDiscussion(String communityId, String discussionId, String token);
 }

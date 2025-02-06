@@ -14,17 +14,11 @@
   "description": {
     "type": "keyword"
   },
-  "tags": {
-    "type": "keyword"
-  },
   "createdBy": {
   "type": "keyword"
   },
   "isActive": {
     "type": "boolean"
-  },
-  "targetTopic": {
-    "type": "keyword"
   },
   "upVoteCount": {
     "type": "number"
@@ -63,5 +57,18 @@
   },
   "searchTags": {
     "type": "keyword"
+  },
+  "mediaCategory": {
+    "properties": {
+      "docs": {
+        "type": "keyword"
+      },
+      "links": {
+        "type": "keyword"
+      },
+      "media": {
+        "type": "keyword"
+      }
+    }
   }
 }

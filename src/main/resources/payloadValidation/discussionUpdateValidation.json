@@ -10,7 +10,7 @@
     },
     "type": {
       "type": "string",
-      "enum": ["question", "feedback","blog","story","poll"]
+      "enum": ["question"]
     },
     "title": {
       "type": "string"
@@ -18,22 +18,30 @@
     "description": {
       "type": "string"
     },
-    "tags": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "targetTopic": {
-      "type": "string"
-    },
-    "mediaUrls": {
-      "type": "array",
-      "items": {
-        "type": "string"
+  "mediaCategory": {
+    "type": "object",
+    "properties": {
+      "docs": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "links": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "media": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
       }
     }
-  },
+  }
+    },
   "required": [
     "discussionId",
     "communityId"
