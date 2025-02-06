@@ -40,9 +40,6 @@
       "epoch_millis"
     ]
   },
-  "mediaUrls": {
-    "type": "keyword"
-  },
   "answerPosts": {
     "type": "keyword"
   },
@@ -58,15 +55,21 @@
   "searchTags": {
     "type": "keyword"
   },
+  "categoryType": {
+    "type": "keyword"
+  },
   "mediaCategory": {
     "properties": {
-      "docs": {
+      "document": {
         "type": "keyword"
       },
-      "links": {
+      "link": {
         "type": "keyword"
       },
-      "media": {
+      "image": {
+        "type": "keyword"
+      },
+      "video": {
         "type": "keyword"
       }
     }

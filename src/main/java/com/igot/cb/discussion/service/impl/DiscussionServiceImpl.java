@@ -237,8 +237,8 @@ public class DiscussionServiceImpl implements DiscussionService {
     public ApiResponse updateDiscussion(JsonNode updateData, String token) {
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("update.Discussion");
+        payloadValidation.validatePayload(Constants.DISCUSSION_UPDATE_VALIDATION_FILE, updateData);
         try {
-            payloadValidation.validatePayload(Constants.DISCUSSION_UPDATE_VALIDATION_FILE, updateData);
             updateMetricsApiCall(Constants.DISCUSSION_UPDATE);
             String discussionId = updateData.get(Constants.DISCUSSION_ID).asText();
             long postgresTime = System.currentTimeMillis();
