@@ -18,33 +18,120 @@
     "description": {
       "type": "string"
     },
-  "mediaCategory": {
-    "type": "object",
-    "properties": {
-      "docs": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "links": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "media": {
-        "type": "array",
-        "items": {
-          "type": "string"
+    "categoryType": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["document", "link", "image", "video"]
+      }
+    },
+    "mediaCategory": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "link": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "image": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "video": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }
-  }
-    },
+  },
   "required": [
     "discussionId",
     "communityId"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "categoryType": {
+            "contains": {
+              "const": "document"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "mediaCategory": {
+            "required": ["document"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "categoryType": {
+            "contains": {
+              "const": "link"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "mediaCategory": {
+            "required": ["link"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "categoryType": {
+            "contains": {
+              "const": "image"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "mediaCategory": {
+            "required": ["image"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "categoryType": {
+            "contains": {
+              "const": "video"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "mediaCategory": {
+            "required": ["video"]
+          }
+        }
+      }
+    }
+  ]
 }
