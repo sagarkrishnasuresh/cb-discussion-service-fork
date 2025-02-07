@@ -109,4 +109,11 @@ public class DiscussionController {
         ApiResponse response = discussionService.unBookmarkDiscussion(communityId, discussionId, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
+
+    @PostMapping("/bookmarkedDiscussions")
+    public ResponseEntity<ApiResponse> getBookmarkedDiscussions(@RequestBody Map<String, Object> getBookmarkedPostsData,
+                                                                @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.getBookmarkedDiscussions(token,getBookmarkedPostsData);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
 }

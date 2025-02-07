@@ -84,7 +84,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Value("${kafka.topic.community.discusion.post.count}")
     private String communityPostCount;
 
-    @PostConstruct
+    //@PostConstruct
     public void init() {
         if (storageService == null) {
             storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
@@ -324,48 +324,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             );
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
-                Map<String, String> discussionToCreatedByMap = discussions.stream()
-                        .collect(Collectors.toMap(
-                                discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
-                                discussion -> discussion.get(Constants.CREATED_BY).toString()));
-
-                Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
-                long userDataRedisTime = System.currentTimeMillis();
-                List<Object> redisResults = fetchDataForKeys(
-                        createdByIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
-                );
-                updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.READ, userDataRedisTime);
-                Map<String, Object> userDetailsMap = redisResults.stream()
-                        .map(user -> (Map<String, Object>) user)
-                        .collect(Collectors.toMap(
-                                user -> user.get(Constants.USER_ID_KEY).toString(),
-                                user -> user));
-
-                List<String> missingUserIds = createdByIds.stream()
-                        .filter(id -> !userDetailsMap.containsKey(id))
-                        .collect(Collectors.toList());
-
-                if (!missingUserIds.isEmpty()) {
-                    List<Object> cassandraResults = fetchUserFromPrimary(missingUserIds);
-                    userDetailsMap.putAll(cassandraResults.stream()
-                            .map(user -> (Map<String, Object>) user)
-                            .collect(Collectors.toMap(
-                                    user -> user.get(Constants.USER_ID_KEY).toString(),
-                                    user -> user)));
-                }
-
-                List<Map<String, Object>> filteredDiscussions = new ArrayList<>();
-                for (Map<String, Object> discussion : discussions) {
-                    String discussionId = discussion.get(Constants.DISCUSSION_ID).toString();
-                    String createdById = discussionToCreatedByMap.get(discussionId);
-                    if (createdById != null && userDetailsMap.containsKey(createdById)) {
-                        discussion.put(Constants.CREATED_BY, userDetailsMap.get(createdById));
-                        filteredDiscussions.add(discussion);
-                    }
-                }
-                JsonNode enhancedData = objectMapper.valueToTree(filteredDiscussions);
-                searchResult.setData(enhancedData);
+                discussions = fetchAndEnhanceDiscussions(discussions);
             }
+
+            JsonNode enhancedData = objectMapper.valueToTree(discussions);
+            searchResult.setData(enhancedData);
             long redisInsertTime = System.currentTimeMillis();
             redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
             updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.INSERT, redisInsertTime);
@@ -1103,7 +1066,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             properties.put(Constants.CREATED_ON, new Timestamp(System.currentTimeMillis()));
             properties.put(Constants.STATUS, true);
             cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties);
-
+            redisTemplate.delete(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + communityId + userId);
             Map<String, Object> map = new HashMap<>();
             map.put(Constants.CREATED_ON, properties.get(Constants.CREATED_ON));
             map.put(Constants.COMMUNITY_ID, communityId);
@@ -1140,10 +1103,131 @@ public class DiscussionServiceImpl implements DiscussionService {
 
         try {
             cassandraOperation.updateRecordByCompositeKey(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties,compositeKeys);
+            redisTemplate.delete(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + communityId + userId);
             return response;
         } catch (Exception e) {
             log.error("DiscussionService::unBookmarkDiscussion: Failed to unBookmark discussion", e);
             return returnErrorMsg(Constants.DISCUSSION_UN_BOOKMARK_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
         }
+    }
+
+    @Override
+    public ApiResponse getBookmarkedDiscussions(String token, Map<String, Object> requestData) {
+        log.info("DiscussionService::getBookmarkedDiscussions: Fetching bookmarked discussions");
+        ApiResponse response = ProjectUtil.createDefaultResponse("discussion.getBookmarkedDiscussions");
+        String errorMsg = validateGetBookmarkedDiscussions(requestData);
+
+        if (StringUtils.isNotBlank(errorMsg)) {
+            return returnErrorMsg(errorMsg, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
+            return returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
+        }
+        try {
+            List<String> cachedKeys = new ArrayList<>();
+            String cachedJson = cacheService.getCache(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + requestData.get(Constants.COMMUNITY_ID) + userId);
+            if (StringUtils.isNotBlank(cachedJson)) {
+                cachedKeys = objectMapper.readValue(cachedJson, new TypeReference<List<String>>() {
+                });
+            } else {
+                Map<String, Object> properties = new HashMap<>();
+                properties.put(Constants.USERID, userId);
+                List<Map<String, Object>> bookmarkedDiscussions = cassandraOperation.getRecordsByPropertiesWithoutFiltering(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.DISCUSSION_ID), null);
+                if (bookmarkedDiscussions.isEmpty()) {
+                    return returnErrorMsg(Constants.NO_DISCUSSIONS_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
+                }
+                for (Map<String, Object> bookmarkedDiscussion : bookmarkedDiscussions) {
+                    cachedKeys.add((String) bookmarkedDiscussion.get("discussionid"));
+                }
+                cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + requestData.get(Constants.COMMUNITY_ID) + userId, cachedKeys);
+            }
+
+            SearchCriteria searchCriteria = new SearchCriteria();
+            HashMap<String, Object> filterCriteria = new HashMap<>();
+            filterCriteria.put(Constants.DISCUSSION_ID, cachedKeys);
+            searchCriteria.setFilterCriteriaMap(filterCriteria);
+            searchCriteria.setPageNumber((int) requestData.get(Constants.PAGE));
+            searchCriteria.setPageSize((int) requestData.get(Constants.PAGE_SIZE));
+            searchCriteria.setOrderBy("DESC");
+            searchCriteria.setOrderBy(Constants.CREATED_ON);
+
+            SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+            List<Map<String, Object>> data = objectMapper.convertValue(
+                    searchResult.getData(),
+                    new TypeReference<List<Map<String, Object>>>() {
+                    }
+            );
+
+            data = fetchAndEnhanceDiscussions(data);
+            HashMap<String, Object> result = new HashMap<>();
+            result.put(Constants.DATA, data);
+            response.setResult(result);
+            return response;
+        } catch (Exception e) {
+            log.error("DiscussionService::getBookmarkedDiscussions: Failed to fetch bookmarked discussions", e);
+            return returnErrorMsg(Constants.DISCUSSION_BOOKMARK_FETCH_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+        }
+    }
+
+    private String validateGetBookmarkedDiscussions(Map<String, Object> requestData) {
+        StringBuffer errorMsg = new StringBuffer();
+        List<String> errList = new ArrayList<>();
+        if (!requestData.containsKey(Constants.COMMUNITY_ID) && StringUtils.isBlank((String) requestData.get(Constants.COMMUNITY_ID))) {
+            errList.add(Constants.COMMUNITY_ID);
+        }
+        if (!requestData.containsKey(Constants.PAGE) || !(requestData.get(Constants.PAGE) instanceof Integer)) {
+            errList.add(Constants.PAGE);
+        }
+        if (!requestData.containsKey(Constants.PAGE_SIZE) || !(requestData.get(Constants.PAGE_SIZE) instanceof Integer)) {
+            errList.add(Constants.PAGE_SIZE);
+        }
+        if (!errList.isEmpty()) {
+            errorMsg.append("Failed Due To Missing Params - ").append(errList).append(".");
+        }
+        return errorMsg.toString();
+    }
+
+    private List<Map<String, Object>> fetchAndEnhanceDiscussions(List<Map<String, Object>> discussions) {
+        Map<String, String> discussionToCreatedByMap = discussions.stream()
+                .collect(Collectors.toMap(
+                        discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
+                        discussion -> discussion.get(Constants.CREATED_BY).toString()));
+
+        Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
+        long userDataRedisTime = System.currentTimeMillis();
+        List<Object> redisResults = fetchDataForKeys(
+                createdByIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
+        );
+        updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.READ, userDataRedisTime);
+        Map<String, Object> userDetailsMap = redisResults.stream()
+                .map(user -> (Map<String, Object>) user)
+                .collect(Collectors.toMap(
+                        user -> user.get(Constants.USER_ID_KEY).toString(),
+                        user -> user));
+
+        List<String> missingUserIds = createdByIds.stream()
+                .filter(id -> !userDetailsMap.containsKey(id))
+                .collect(Collectors.toList());
+
+        if (!missingUserIds.isEmpty()) {
+            List<Object> cassandraResults = fetchUserFromPrimary(missingUserIds);
+            userDetailsMap.putAll(cassandraResults.stream()
+                    .map(user -> (Map<String, Object>) user)
+                    .collect(Collectors.toMap(
+                            user -> user.get(Constants.USER_ID_KEY).toString(),
+                            user -> user)));
+        }
+
+        List<Map<String, Object>> filteredDiscussions = new ArrayList<>();
+        for (Map<String, Object> discussion : discussions) {
+            String discussionId = discussion.get(Constants.DISCUSSION_ID).toString();
+            String createdById = discussionToCreatedByMap.get(discussionId);
+            if (createdById != null && userDetailsMap.containsKey(createdById)) {
+                discussion.put(Constants.CREATED_BY, userDetailsMap.get(createdById));
+                filteredDiscussions.add(discussion);
+            }
+        }
+        return filteredDiscussions;
     }
 }

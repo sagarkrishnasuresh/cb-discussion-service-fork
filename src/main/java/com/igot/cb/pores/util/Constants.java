@@ -186,6 +186,10 @@ public class Constants {
     public static final String POST_REPORTED_BY_USER = "post_reportedby_user";
     public static final String REASON = "reason";
     public static final String REPORTED = "reported";
+    public static final String COMMUNITY = "community";
+    public static final String PAGE = "page";
+    public static final String PAGE_SIZE = "pageSize";
+    public static final String DATA = "data";
 
     private Constants() {
     }
