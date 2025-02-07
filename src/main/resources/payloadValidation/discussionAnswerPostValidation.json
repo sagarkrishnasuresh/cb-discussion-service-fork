@@ -12,16 +12,12 @@
     "communityId": {
       "type": "string"
     },
-    "title": {
-      "type": "string"
-    },
     "description": {
       "type": "string"
     }
   },
   "required": [
     "type",
-    "title",
     "parentDiscussionId",
     "communityId"
   ],

@@ -12,9 +12,6 @@
       "type": "string",
       "enum": ["question"]
     },
-    "title": {
-      "type": "string"
-    },
     "description": {
       "type": "string"
     },
