@@ -5,9 +5,6 @@
   "type": {
     "type": "keyword"
   },
-  "title": {
-    "type": "keyword"
-  },
   "communityId": {
     "type": "keyword"
   },

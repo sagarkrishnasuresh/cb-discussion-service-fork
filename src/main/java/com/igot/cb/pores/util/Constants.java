@@ -97,7 +97,6 @@ public class Constants {
     public static final String ID_NOT_FOUND = "Id not found";
     public static final String INVALID_ID = "Invalid Id";
     public static final String TYPE = "type";
-    public static final String TITLE = "title";
     public static final String DESCRIPTION_PAYLOAD = "description";
     public static final String IS_ACTIVE = "isActive";
     public static final String DELETED_SUCCESSFULLY = "deleted successfully";

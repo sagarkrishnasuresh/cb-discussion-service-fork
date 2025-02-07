@@ -6,9 +6,6 @@
       "type": "string",
       "enum": ["question"]
     },
-    "title": {
-      "type": "string"
-    },
     "description": {
       "type": "string"
     },
@@ -18,7 +15,6 @@
   },
   "required": [
     "type",
-    "title",
     "communityId"
   ],
     "additionalProperties": false

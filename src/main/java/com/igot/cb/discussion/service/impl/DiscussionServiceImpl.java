@@ -145,7 +145,6 @@ public class DiscussionServiceImpl implements DiscussionService {
             updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.INSERT, postgresTime);
 
             List<String> searchTags = Arrays.asList(
-                    discussionDetails.get(Constants.TITLE).textValue().toLowerCase(),
                     discussionDetails.get(Constants.DESCRIPTION_PAYLOAD).textValue().toLowerCase()
             );
             ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
