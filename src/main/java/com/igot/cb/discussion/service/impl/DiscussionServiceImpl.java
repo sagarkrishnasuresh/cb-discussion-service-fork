@@ -1066,7 +1066,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             properties.put(Constants.CREATED_ON, new Timestamp(System.currentTimeMillis()));
             properties.put(Constants.STATUS, true);
             cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties);
-            redisTemplate.delete(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + communityId + userId);
+            cacheService.deleteCache(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + communityId + userId);
             Map<String, Object> map = new HashMap<>();
             map.put(Constants.CREATED_ON, properties.get(Constants.CREATED_ON));
             map.put(Constants.COMMUNITY_ID, communityId);
@@ -1103,7 +1103,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
         try {
             cassandraOperation.updateRecordByCompositeKey(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties,compositeKeys);
-            redisTemplate.delete(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + communityId + userId);
+            cacheService.deleteCache(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + communityId + userId);
             return response;
         } catch (Exception e) {
             log.error("DiscussionService::unBookmarkDiscussion: Failed to unBookmark discussion", e);
@@ -1152,16 +1152,22 @@ public class DiscussionServiceImpl implements DiscussionService {
             searchCriteria.setOrderBy("DESC");
             searchCriteria.setOrderBy(Constants.CREATED_ON);
 
-            SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
-            List<Map<String, Object>> data = objectMapper.convertValue(
-                    searchResult.getData(),
-                    new TypeReference<List<Map<String, Object>>>() {
-                    }
-            );
+            SearchResult searchResult = redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
+            if (searchResult == null) {
+                searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+                List<Map<String, Object>> data = objectMapper.convertValue(
+                        searchResult.getData(),
+                        new TypeReference<List<Map<String, Object>>>() {
+                        }
+                );
+                data = fetchAndEnhanceDiscussions(data);
+                JsonNode enhancedData = objectMapper.valueToTree(data);
+                searchResult.setData(enhancedData);
+                redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
+            }
 
-            data = fetchAndEnhanceDiscussions(data);
             HashMap<String, Object> result = new HashMap<>();
-            result.put(Constants.DATA, data);
+            result.put(Constants.SEARCH_RESULTS, searchResult);
             response.setResult(result);
             return response;
         } catch (Exception e) {
