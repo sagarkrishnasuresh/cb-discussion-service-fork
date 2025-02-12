@@ -116,4 +116,20 @@ public class DiscussionController {
         ApiResponse response = discussionService.getBookmarkedDiscussions(token,getBookmarkedPostsData);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
+
+    @PostMapping("/communityFeed/{communityId}")
+    public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@PathVariable String communityId,
+                                                                   @RequestBody Map<String, Object> paginationParams) {
+        ApiResponse response = discussionService.searchDiscussionByCommunity(communityId, paginationParams);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @DeleteMapping("/deleteCache/{communityId}")
+    public ResponseEntity<ApiResponse> deleteCommunityCache(@PathVariable String communityId) {
+        discussionService.deleteCommunityCache(communityId);
+        ApiResponse response = new ApiResponse();
+        response.setResponseCode(HttpStatus.OK);
+        response.getParams().setStatus(Constants.SUCCESS);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
 }

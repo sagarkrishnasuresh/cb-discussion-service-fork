@@ -37,4 +37,8 @@ public interface DiscussionService {
     ApiResponse unBookmarkDiscussion(String communityId, String discussionId, String token);
 
     ApiResponse getBookmarkedDiscussions(String token,Map<String, Object> getBookmarkedPostsData);
+
+    ApiResponse searchDiscussionByCommunity(String communityId, Map<String, Object> paginationParams);
+
+    ApiResponse deleteCommunityCache(String communityId);
 }

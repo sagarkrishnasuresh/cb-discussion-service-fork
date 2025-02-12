@@ -43,4 +43,9 @@ public class CbServerProperties {
   @Value("${report.post.user.limit}")
   private int reportPostUserLimit;
 
+  @Value("${discussion.es.defaultPageSize}")
+    private int discussionEsDefaultPageSize;
+
+  @Value("${discussion.feed.redis.ttl}")
+  private long discussionFeedRedisTtl;
 }

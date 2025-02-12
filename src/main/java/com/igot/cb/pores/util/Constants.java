@@ -191,6 +191,9 @@ public class Constants {
     public static final String PAGE_SIZE = "pageSize";
     public static final String DATA = "data";
     public static final String TOTAL_COUNT = "totalCount";
+    public static final String PAGE_NUMBER = "pageNumber";
+    public static final String DESC = "DESC";
+    public static final String SEARCH_STRING = "searchString";
 
     private Constants() {
     }
