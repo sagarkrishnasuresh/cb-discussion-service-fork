@@ -194,6 +194,9 @@ public class Constants {
     public static final String PAGE_NUMBER = "pageNumber";
     public static final String DESC = "DESC";
     public static final String SEARCH_STRING = "searchString";
+    public static final String UNEXPECTED_PARAMETER = "Unexpected parameter: ";
+    public static final String MISSING_PARAMETER = "Missing parameter: ";
+    public static final String MISSING_REQUEST_DATA= "Failed Due To Missing Params - requestData is null.";
 
     private Constants() {
     }

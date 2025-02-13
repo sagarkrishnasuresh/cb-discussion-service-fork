@@ -40,8 +40,9 @@ public class DiscussionController {
     }
 
     @PostMapping("/search")
-    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria){
-        ApiResponse response = discussionService.searchDiscussion(searchCriteria);
+    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria,
+                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
+        ApiResponse response = discussionService.searchDiscussion(searchCriteria,token);
         return new ResponseEntity<>(response,response.getResponseCode());
     }
 
@@ -119,17 +120,9 @@ public class DiscussionController {
 
     @PostMapping("/communityFeed/{communityId}")
     public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@PathVariable String communityId,
-                                                                   @RequestBody Map<String, Object> paginationParams) {
-        ApiResponse response = discussionService.searchDiscussionByCommunity(communityId, paginationParams);
+                                                                   @RequestBody Map<String, Object> paginationParams,
+                                                                   @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.searchDiscussionByCommunity(communityId, paginationParams, token);
         return new ResponseEntity<>(response, response.getResponseCode());
-    }
-
-    @DeleteMapping("/deleteCache/{communityId}")
-    public ResponseEntity<ApiResponse> deleteCommunityCache(@PathVariable String communityId) {
-        discussionService.deleteCommunityCache(communityId);
-        ApiResponse response = new ApiResponse();
-        response.setResponseCode(HttpStatus.OK);
-        response.getParams().setStatus(Constants.SUCCESS);
-        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
