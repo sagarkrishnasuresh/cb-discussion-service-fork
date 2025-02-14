@@ -16,7 +16,7 @@ public interface DiscussionService {
 
     ApiResponse updateDiscussion(JsonNode updateData,String token);
 
-    ApiResponse searchDiscussion(SearchCriteria searchCriteria);
+    ApiResponse searchDiscussion(SearchCriteria searchCriteria, String token);
 
     ApiResponse deleteDiscussion(String discussionId,String token);
 
@@ -37,4 +37,6 @@ public interface DiscussionService {
     ApiResponse unBookmarkDiscussion(String communityId, String discussionId, String token);
 
     ApiResponse getBookmarkedDiscussions(String token,Map<String, Object> getBookmarkedPostsData);
+
+    ApiResponse searchDiscussionByCommunity(String communityId, Map<String, Object> paginationParams, String token);
 }

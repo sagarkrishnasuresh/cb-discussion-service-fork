@@ -40,8 +40,9 @@ public class DiscussionController {
     }
 
     @PostMapping("/search")
-    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria){
-        ApiResponse response = discussionService.searchDiscussion(searchCriteria);
+    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria,
+                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
+        ApiResponse response = discussionService.searchDiscussion(searchCriteria,token);
         return new ResponseEntity<>(response,response.getResponseCode());
     }
 
@@ -114,6 +115,14 @@ public class DiscussionController {
     public ResponseEntity<ApiResponse> getBookmarkedDiscussions(@RequestBody Map<String, Object> getBookmarkedPostsData,
                                                                 @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = discussionService.getBookmarkedDiscussions(token,getBookmarkedPostsData);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/communityFeed/{communityId}")
+    public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@PathVariable String communityId,
+                                                                   @RequestBody Map<String, Object> paginationParams,
+                                                                   @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.searchDiscussionByCommunity(communityId, paginationParams, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 }

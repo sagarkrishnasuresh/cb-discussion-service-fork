@@ -42,5 +42,4 @@ public class CbServerProperties {
 
   @Value("${report.post.user.limit}")
   private int reportPostUserLimit;
-
 }

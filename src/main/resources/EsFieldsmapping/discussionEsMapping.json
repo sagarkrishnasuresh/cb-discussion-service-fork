@@ -52,6 +52,9 @@
   "searchTags": {
     "type": "keyword"
   },
+  "reportedBy": {
+    "type": "keyword"
+  },
   "categoryType": {
     "type": "keyword"
   },

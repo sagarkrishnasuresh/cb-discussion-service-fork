@@ -294,44 +294,37 @@ public class DiscussionServiceImpl implements DiscussionService {
 
 
     @Override
-    public ApiResponse searchDiscussion(SearchCriteria searchCriteria) {
+    public ApiResponse searchDiscussion(SearchCriteria searchCriteria, String token) {
         log.info("DiscussionServiceImpl::searchDiscussion");
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
-        updateMetricsApiCall(Constants.DISCUSSION_SEARCH);
-        long redisTime = System.currentTimeMillis();
-        SearchResult searchResult =redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
-        updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, "search", redisTime);
-        if (searchResult != null) {
-            log.info("DiscussionServiceImpl::searchDiscussion:  search result fetched from redis");
-            response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
-            createSuccessResponse(response);
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
+            response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
             return response;
         }
+
         String searchString = searchCriteria.getSearchString();
         if (searchString != null && !searchString.isEmpty() && searchString.length() < 3) {
             createErrorResponse(response, Constants.MINIMUM_CHARACTERS_NEEDED, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
             return response;
         }
         try {
-            long esTime = System.currentTimeMillis();
-            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
-            updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.ELASTICSEARCH, "search", esTime);
-            List<Map<String, Object>> discussions = objectMapper.convertValue(
-                    searchResult.getData(),
-                    new TypeReference<List<Map<String, Object>>>() {
-                    }
-            );
+            if (searchCriteria.getQuery() == null) {
+                searchCriteria.setQuery(new HashMap<>());
+            }
+            Map<String, Object> mustNotMap = getMustNotMap(userId);
+            searchCriteria.getQuery().putAll(mustNotMap);
+
+            SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+            List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
                 discussions = fetchAndEnhanceDiscussions(discussions);
             }
 
-            JsonNode enhancedData = objectMapper.valueToTree(discussions);
-            searchResult.setData(enhancedData);
-            long redisInsertTime = System.currentTimeMillis();
-            redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
-            updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.INSERT, redisInsertTime);
+            searchResult.setData(discussions);
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
             createSuccessResponse(response);
             return response;
@@ -812,8 +805,18 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             if (!data.get(Constants.STATUS).textValue().equals(status)) {
                 data.put(Constants.STATUS, status);
-                discussionRepository.save(discussionEntity);
             }
+
+            ArrayNode reportedByArray;
+            if (data.has(Constants.REPORTED_BY)) {
+                reportedByArray = (ArrayNode) data.get(Constants.REPORTED_BY);
+            } else {
+                reportedByArray = objectMapper.createArrayNode();
+                data.set(Constants.REPORTED_BY, reportedByArray);
+            }
+            reportedByArray.add(userId);
+            discussionEntity.setData(data);
+            discussionRepository.save(discussionEntity);
             jsonNode.setAll(data);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
@@ -1138,7 +1141,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                     return returnErrorMsg(Constants.NO_DISCUSSIONS_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
                 }
                 for (Map<String, Object> bookmarkedDiscussion : bookmarkedDiscussions) {
-                    cachedKeys.add((String) bookmarkedDiscussion.get("discussionid"));
+                    cachedKeys.add((String) bookmarkedDiscussion.get(Constants.DISCUSSION_ID_KEY));
                 }
                 cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + requestData.get(Constants.COMMUNITY_ID) + userId, cachedKeys);
             }
@@ -1149,20 +1152,23 @@ public class DiscussionServiceImpl implements DiscussionService {
             searchCriteria.setFilterCriteriaMap(filterCriteria);
             searchCriteria.setPageNumber((int) requestData.get(Constants.PAGE));
             searchCriteria.setPageSize((int) requestData.get(Constants.PAGE_SIZE));
-            searchCriteria.setOrderBy("DESC");
+            searchCriteria.setOrderDirection(Constants.DESC);
             searchCriteria.setOrderBy(Constants.CREATED_ON);
+
+            if (requestData.containsKey(Constants.SEARCH_STRING) && StringUtils.isNotBlank((String) requestData.get(Constants.SEARCH_STRING))) {
+                if (((String) requestData.get(Constants.SEARCH_STRING)).length() < 3) {
+                    createErrorResponse(response, Constants.MINIMUM_CHARACTERS_NEEDED, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
+                    return response;
+                }
+                searchCriteria.setSearchString((String) requestData.get(Constants.SEARCH_STRING));
+            }
 
             SearchResult searchResult = redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
             if (searchResult == null) {
                 searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
-                List<Map<String, Object>> data = objectMapper.convertValue(
-                        searchResult.getData(),
-                        new TypeReference<List<Map<String, Object>>>() {
-                        }
-                );
+                List<Map<String, Object>> data = searchResult.getData();
                 data = fetchAndEnhanceDiscussions(data);
-                JsonNode enhancedData = objectMapper.valueToTree(data);
-                searchResult.setData(enhancedData);
+                searchResult.setData(data);
                 redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
             }
 
@@ -1177,8 +1183,13 @@ public class DiscussionServiceImpl implements DiscussionService {
     }
 
     private String validateGetBookmarkedDiscussions(Map<String, Object> requestData) {
+        if (requestData == null) {
+            return Constants.MISSING_REQUEST_DATA;
+        }
+
         StringBuffer errorMsg = new StringBuffer();
         List<String> errList = new ArrayList<>();
+
         if (!requestData.containsKey(Constants.COMMUNITY_ID) && StringUtils.isBlank((String) requestData.get(Constants.COMMUNITY_ID))) {
             errList.add(Constants.COMMUNITY_ID);
         }
@@ -1235,5 +1246,91 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
         }
         return filteredDiscussions;
+    }
+
+    @Override
+    public ApiResponse searchDiscussionByCommunity(String communityId, Map<String, Object> paginationParams, String token) {
+        log.info("DiscussionServiceImpl::searchDiscussionByCommunity");
+        ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion.by.community");
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
+            createErrorResponse(response, Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, Constants.FAILED);
+            return response;
+        }
+
+        if (StringUtils.isBlank(communityId)) {
+            createErrorResponse(response, Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
+            return response;
+        }
+
+        String errorMsg = validatePaginationParams(paginationParams);
+        if (!errorMsg.isEmpty()) {
+            createErrorResponse(response, errorMsg, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
+            return response;
+        }
+        SearchCriteria searchCriteria = getCriteria((int) paginationParams.getOrDefault(Constants.PAGE_NUMBER, 0), (int) paginationParams.getOrDefault(Constants.PAGE_SIZE, 10));
+
+        try {
+            if (searchCriteria.getQuery() == null) {
+                searchCriteria.setQuery(new HashMap<>());
+            }
+            Map<String, Object> mustNotMap = getMustNotMap(userId);
+            searchCriteria.getQuery().putAll(mustNotMap);
+            searchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, communityId);
+            SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+            List<Map<String, Object>> discussions = searchResult.getData();
+            if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
+                discussions = fetchAndEnhanceDiscussions(discussions);
+            }
+
+            searchResult.setData(discussions);
+            response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
+            return response;
+        } catch (Exception e) {
+            log.error("error while searching discussion by community: {} .", e.getMessage(), e);
+            createErrorResponse(response, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED_CONST);
+            return response;
+        }
+    }
+
+    private static Map<String, Object> getMustNotMap(String userId) {
+        Map<String, Object> mustNotMap = new HashMap<>();
+        List<Map<String, Object>> mustNotList = new ArrayList<>();
+        Map<String, Object> reportedByMatch = new HashMap<>();
+        reportedByMatch.put(Constants.REPORTED_BY, userId);
+        Map<String, Object> reportedByCondition = new HashMap<>();
+        reportedByCondition.put(Constants.MATCH, reportedByMatch);
+        mustNotList.add(reportedByCondition);
+        mustNotMap.put(Constants.MUST_NOT, mustNotList);
+        return mustNotMap;
+    }
+
+    private SearchCriteria getCriteria(int pageNumber, int pageSize) {
+        SearchCriteria searchCriteria = new SearchCriteria();
+        searchCriteria.setPageNumber(pageNumber);
+        searchCriteria.setPageSize(pageSize);
+        searchCriteria.setOrderBy(Constants.CREATED_ON);
+        searchCriteria.setOrderDirection(Constants.DESC);
+        searchCriteria.setFilterCriteriaMap(new HashMap<>());
+        searchCriteria.setRequestedFields(new ArrayList<>());
+        return searchCriteria;
+    }
+
+    private String validatePaginationParams(Map<String, Object> paginationParams) {
+        StringBuilder errorMsg = new StringBuilder();
+        Set<String> allowedParams = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(Constants.PAGE_NUMBER, Constants.PAGE_SIZE)));
+
+        for (String param : paginationParams.keySet()) {
+            if (!allowedParams.contains(param)) {
+                errorMsg.append(Constants.UNEXPECTED_PARAMETER).append(param).append(". ");
+            }
+        }
+        if (!paginationParams.containsKey(Constants.PAGE_NUMBER) || !(paginationParams.get(Constants.PAGE_NUMBER) instanceof Integer)) {
+            errorMsg.append(Constants.MISSING_PARAMETER + Constants.PAGE_NUMBER + ". ");
+        }
+        if (!paginationParams.containsKey(Constants.PAGE_SIZE) || !(paginationParams.get(Constants.PAGE_SIZE) instanceof Integer)) {
+            errorMsg.append(Constants.MISSING_PARAMETER + Constants.PAGE_SIZE + ". ");
+        }
+        return errorMsg.toString();
     }
 }
