@@ -1249,7 +1249,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     }
 
     @Override
-    public ApiResponse searchDiscussionByCommunity(String communityId, Map<String, Object> paginationParams, String token) {
+    public ApiResponse searchDiscussionByCommunity(SearchCriteria searchCriteria, String token) {
         log.info("DiscussionServiceImpl::searchDiscussionByCommunity");
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion.by.community");
         String userId = accessTokenValidator.verifyUserToken(token);
@@ -1258,17 +1258,17 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
 
-        if (StringUtils.isBlank(communityId)) {
+        Map<String, Object> filterCriteria = searchCriteria.getFilterCriteriaMap();
+        if (filterCriteria == null || !filterCriteria.containsKey(Constants.COMMUNITY_ID)) {
             createErrorResponse(response, Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
             return response;
         }
 
-        String errorMsg = validatePaginationParams(paginationParams);
-        if (!errorMsg.isEmpty()) {
-            createErrorResponse(response, errorMsg, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
+        String communityId = (String) filterCriteria.get(Constants.COMMUNITY_ID);
+        if (StringUtils.isBlank(communityId)) {
+            createErrorResponse(response, Constants.INVALID_COMMUNITY_ID, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
             return response;
         }
-        SearchCriteria searchCriteria = getCriteria((int) paginationParams.getOrDefault(Constants.PAGE_NUMBER, 0), (int) paginationParams.getOrDefault(Constants.PAGE_SIZE, 10));
 
         try {
             if (searchCriteria.getQuery() == null) {
@@ -1276,15 +1276,17 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             Map<String, Object> mustNotMap = getMustNotMap(userId);
             searchCriteria.getQuery().putAll(mustNotMap);
-            searchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, communityId);
+
             SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
             List<Map<String, Object>> discussions = searchResult.getData();
+
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
                 discussions = fetchAndEnhanceDiscussions(discussions);
             }
 
             searchResult.setData(discussions);
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
+            createSuccessResponse(response);
             return response;
         } catch (Exception e) {
             log.error("error while searching discussion by community: {} .", e.getMessage(), e);
@@ -1314,23 +1316,5 @@ public class DiscussionServiceImpl implements DiscussionService {
         searchCriteria.setFilterCriteriaMap(new HashMap<>());
         searchCriteria.setRequestedFields(new ArrayList<>());
         return searchCriteria;
-    }
-
-    private String validatePaginationParams(Map<String, Object> paginationParams) {
-        StringBuilder errorMsg = new StringBuilder();
-        Set<String> allowedParams = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(Constants.PAGE_NUMBER, Constants.PAGE_SIZE)));
-
-        for (String param : paginationParams.keySet()) {
-            if (!allowedParams.contains(param)) {
-                errorMsg.append(Constants.UNEXPECTED_PARAMETER).append(param).append(". ");
-            }
-        }
-        if (!paginationParams.containsKey(Constants.PAGE_NUMBER) || !(paginationParams.get(Constants.PAGE_NUMBER) instanceof Integer)) {
-            errorMsg.append(Constants.MISSING_PARAMETER + Constants.PAGE_NUMBER + ". ");
-        }
-        if (!paginationParams.containsKey(Constants.PAGE_SIZE) || !(paginationParams.get(Constants.PAGE_SIZE) instanceof Integer)) {
-            errorMsg.append(Constants.MISSING_PARAMETER + Constants.PAGE_SIZE + ". ");
-        }
-        return errorMsg.toString();
     }
 }

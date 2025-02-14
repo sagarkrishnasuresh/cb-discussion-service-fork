@@ -38,5 +38,5 @@ public interface DiscussionService {
 
     ApiResponse getBookmarkedDiscussions(String token,Map<String, Object> getBookmarkedPostsData);
 
-    ApiResponse searchDiscussionByCommunity(String communityId, Map<String, Object> paginationParams, String token);
+    ApiResponse searchDiscussionByCommunity(SearchCriteria searchCriteria, String token);
 }
