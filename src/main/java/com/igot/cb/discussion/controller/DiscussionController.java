@@ -118,11 +118,10 @@ public class DiscussionController {
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @PostMapping("/communityFeed/{communityId}")
-    public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@PathVariable String communityId,
-                                                                   @RequestBody Map<String, Object> paginationParams,
+    @PostMapping("/communityFeed")
+    public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@RequestBody SearchCriteria searchCriteria,
                                                                    @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-        ApiResponse response = discussionService.searchDiscussionByCommunity(communityId, paginationParams, token);
+        ApiResponse response = discussionService.searchDiscussionByCommunity(searchCriteria, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 }
