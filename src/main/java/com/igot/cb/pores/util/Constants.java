@@ -97,8 +97,7 @@ public class Constants {
     public static final String ID_NOT_FOUND = "Id not found";
     public static final String INVALID_ID = "Invalid Id";
     public static final String TYPE = "type";
-    public static final String TITLE = "title";
-    public static final String DESCRIPTION_PAYLOAD = "Description";
+    public static final String DESCRIPTION_PAYLOAD = "description";
     public static final String IS_ACTIVE = "isActive";
     public static final String DELETED_SUCCESSFULLY = "deleted successfully";
     public static final String NO_DATA_FOUND = "No data found";
@@ -160,6 +159,45 @@ public class Constants {
     public static final String CASSANDRA = "cassandra";
     public static final String DISCUSSION_READ = "discussion/read";
     public static final String UPDATE_KEY = "update";
+    public static final String SEARCHTAGS = "searchTags";
+    public static final String INVALID_COMMUNITY_ID = "Invalid communityId";
+    public static final String COMMUNITY_ID = "communityId";
+    public static final String COMMUNITY_ID_CANNOT_BE_UPDATED = "communityId cannot be updated";
+    public static final String INVALID_DISCUSSION_ID = "Invalid discussionId";
+    public static final String ANSWER_POST_ID = "answerPostId";
+    public static final String INVALID_ANSWER_POST_ID = "Invalid answerPostId";
+    public static final String FAILED_TO_UPDATE_ANSWER_POST = "Failed to update the answer post";
+    public static final String ANSWER_POST_UPDATE_VALIDATION_FILE = "/payloadValidation/answerPostUpdateValidation.json";
+    public static final String INCREMENT = "increment";
+    public static final String DECREMENT = "decrement";
+    public static final String POST = "post";
+    public static final String USER_COMMUNITY = "user_community";
+    public static final String USER_NOT_PART_OF_COMMUNITY = "User is not part of the community";
+    public static final String DISCUSSION_BOOKMARKS = "user_post_bookmarks";
+    public static final String ALREADY_BOOKMARKED = "Already bookmarked";
+    public static final String DISCUSSION_BOOKMARK_FAILED = "Failed to bookmark the post";
+    public static final String DISCUSSION_UN_BOOKMARK_FAILED = "Failed to unBookmark the post";
+    public static final String NO_DISCUSSIONS_FOUND = "No discussions found";
+    public static final String DISCUSSION_BOOKMARK_FETCH_FAILED = "Failed to fetch bookmarked discussions";
+    public static final String DISCUSSIONS = "discussions";
+    public static final String FILES = "files";
+    public static final String DISCUSSION_UPLOAD_FILE_FETCH_FAILED = "Failed to fetch uploaded files";
+    public static final String USER_REPORTED_POSTS= "user_reported_posts";
+    public static final String POST_REPORTED_BY_USER = "post_reportedby_user";
+    public static final String REASON = "reason";
+    public static final String REPORTED = "reported";
+    public static final String COMMUNITY = "community";
+    public static final String PAGE = "page";
+    public static final String PAGE_SIZE = "pageSize";
+    public static final String DATA = "data";
+    public static final String TOTAL_COUNT = "totalCount";
+    public static final String PAGE_NUMBER = "pageNumber";
+    public static final String DESC = "DESC";
+    public static final String SEARCH_STRING = "searchString";
+    public static final String UNEXPECTED_PARAMETER = "Unexpected parameter: ";
+    public static final String MISSING_PARAMETER = "Missing parameter: ";
+    public static final String MISSING_REQUEST_DATA= "Failed Due To Missing Params - requestData is null.";
+
     private Constants() {
     }
 }

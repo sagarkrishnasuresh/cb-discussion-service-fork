@@ -156,7 +156,7 @@ public class EsUtilServiceImpl implements EsUtilService {
             Map<String, List<FacetDTO>> fieldAggregations =
                     extractFacetData(paginatedSearchResponse, searchCriteria);
             SearchResult searchResult = new SearchResult();
-            searchResult.setData(objectMapper.valueToTree(paginatedResult));
+            searchResult.setData(paginatedResult);
             searchResult.setFacets(fieldAggregations);
             searchResult.setTotalCount(paginatedSearchResponse.getHits().getTotalHits().value);
             return searchResult;
@@ -408,6 +408,18 @@ public class EsUtilServiceImpl implements EsUtilService {
                     return buildMatchQuery((Map<String, Object>) value);
                 case Constants.RANGE:
                     return buildRangeQuery((Map<String, Object>) value);
+                case Constants.MUST_NOT:
+                    if (value instanceof List) {
+                        BoolQueryBuilder boolQueryBuilder = QueryBuilders.boolQuery();
+                        for (Object item : (List<?>) value) {
+                            if (item instanceof Map) {
+                                boolQueryBuilder.mustNot(buildQueryPart((Map<String, Object>) item));
+                            }
+                        }
+                        return boolQueryBuilder;
+                    } else {
+                        throw new IllegalArgumentException("must_not value should be a list of conditions");
+                    }
                 default:
                     throw new IllegalArgumentException(Constants.UNSUPPORTED_QUERY + key);
             }

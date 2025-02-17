@@ -5,13 +5,10 @@
   "type": {
     "type": "keyword"
   },
-  "title": {
+  "communityId": {
     "type": "keyword"
   },
   "description": {
-    "type": "keyword"
-  },
-  "tags": {
     "type": "keyword"
   },
   "createdBy": {
@@ -19,9 +16,6 @@
   },
   "isActive": {
     "type": "boolean"
-  },
-  "targetTopic": {
-    "type": "keyword"
   },
   "upVoteCount": {
     "type": "number"
@@ -43,9 +37,6 @@
       "epoch_millis"
     ]
   },
-  "mediaUrls": {
-    "type": "keyword"
-  },
   "answerPosts": {
     "type": "keyword"
   },
@@ -57,5 +48,30 @@
   },
   "status": {
     "type": "keyword"
+  },
+  "searchTags": {
+    "type": "keyword"
+  },
+  "reportedBy": {
+    "type": "keyword"
+  },
+  "categoryType": {
+    "type": "keyword"
+  },
+  "mediaCategory": {
+    "properties": {
+      "document": {
+        "type": "keyword"
+      },
+      "link": {
+        "type": "keyword"
+      },
+      "image": {
+        "type": "keyword"
+      },
+      "video": {
+        "type": "keyword"
+      }
+    }
   }
 }

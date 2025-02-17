@@ -4,32 +4,18 @@
   "properties": {
     "type": {
       "type": "string",
-      "enum": ["question", "feedback","blog","story","poll"]
-    },
-    "title": {
-      "type": "string"
+      "enum": ["question"]
     },
     "description": {
       "type": "string"
     },
-    "tags": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "targetTopic": {
+    "communityId": {
       "type": "string"
-    },
-    "mediaUrls": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
     }
   },
   "required": [
     "type",
-    "title"
-  ]
+    "communityId"
+  ],
+    "additionalProperties": false
 }

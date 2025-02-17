@@ -16,7 +16,7 @@ public interface DiscussionService {
 
     ApiResponse updateDiscussion(JsonNode updateData,String token);
 
-    ApiResponse searchDiscussion(SearchCriteria searchCriteria);
+    ApiResponse searchDiscussion(SearchCriteria searchCriteria, String token);
 
     ApiResponse deleteDiscussion(String discussionId,String token);
 
@@ -28,5 +28,15 @@ public interface DiscussionService {
 
     ApiResponse report(String token, Map<String, Object> reportData);
 
-    ApiResponse uploadFile(MultipartFile file);
+    ApiResponse uploadFile(MultipartFile file,String communityId,String discussionId);
+
+    ApiResponse updateAnswerPost(JsonNode updateData,String token);
+
+    ApiResponse bookmarkDiscussion(String token, String communityId, String discussionId);
+
+    ApiResponse unBookmarkDiscussion(String communityId, String discussionId, String token);
+
+    ApiResponse getBookmarkedDiscussions(String token,Map<String, Object> getBookmarkedPostsData);
+
+    ApiResponse searchDiscussionByCommunity(SearchCriteria searchCriteria, String token);
 }

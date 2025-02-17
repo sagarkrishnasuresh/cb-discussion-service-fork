@@ -2,15 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "discussionId": {
+    "answerPostId": {
       "type": "string"
-    },
-    "communityId": {
-      "type": "string"
-    },
-    "type": {
-      "type": "string",
-      "enum": ["question"]
     },
     "description": {
       "type": "string"
@@ -53,8 +46,7 @@
     }
   },
   "required": [
-    "discussionId",
-    "communityId"
+    "answerPostId"
   ],
   "additionalProperties": false,
   "allOf": [

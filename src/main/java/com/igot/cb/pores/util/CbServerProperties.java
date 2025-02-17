@@ -40,4 +40,6 @@ public class CbServerProperties {
   @Value("${cloud.storage.endpoint}")
   private String cloudStorageEndpoint;
 
+  @Value("${report.post.user.limit}")
+  private int reportPostUserLimit;
 }

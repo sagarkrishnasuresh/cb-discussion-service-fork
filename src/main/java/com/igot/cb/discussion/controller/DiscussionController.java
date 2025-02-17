@@ -40,8 +40,9 @@ public class DiscussionController {
     }
 
     @PostMapping("/search")
-    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria){
-        ApiResponse response = discussionService.searchDiscussion(searchCriteria);
+    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria,
+                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
+        ApiResponse response = discussionService.searchDiscussion(searchCriteria,token);
         return new ResponseEntity<>(response,response.getResponseCode());
     }
 
@@ -80,9 +81,47 @@ public class DiscussionController {
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @PostMapping("/fileUpload")
-    public ResponseEntity<ApiResponse> uploadFile(@RequestParam(value = "file", required = true) MultipartFile multipartFile){
-        ApiResponse uploadResponse = discussionService.uploadFile(multipartFile);
+    @PostMapping("/fileUpload/{communityId}/{discussionId}")
+    public ResponseEntity<ApiResponse> uploadFile(
+            @RequestParam(value = "file", required = true) MultipartFile multipartFile,
+            @PathVariable(value = "communityId", required = true) String communityId,
+            @PathVariable(value = "discussionId", required = true) String discussionId)  {
+        ApiResponse uploadResponse = discussionService.uploadFile(multipartFile, communityId,discussionId);
         return new ResponseEntity<>(uploadResponse, uploadResponse.getResponseCode());
+    }
+
+    @PostMapping("/updateAnswerPost")
+    public ResponseEntity<ApiResponse> updateAnswerPost(@RequestBody JsonNode updateData,
+                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
+        ApiResponse response = discussionService.updateAnswerPost(updateData,token);
+        return new ResponseEntity<>(response,response.getResponseCode());
+    }
+
+    @GetMapping("/bookmark/{communityId}/{discussionId}")
+    public ResponseEntity<ApiResponse> bookmarkDiscussion(@PathVariable String communityId, @PathVariable String discussionId,
+                                                          @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.bookmarkDiscussion(token, communityId, discussionId);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/unBookmark/{communityId}/{discussionId}")
+    public ResponseEntity<ApiResponse> unBookmarkDiscussion(@PathVariable String communityId, @PathVariable String discussionId,
+                                                           @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.unBookmarkDiscussion(communityId, discussionId, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/bookmarkedDiscussions")
+    public ResponseEntity<ApiResponse> getBookmarkedDiscussions(@RequestBody Map<String, Object> getBookmarkedPostsData,
+                                                                @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.getBookmarkedDiscussions(token,getBookmarkedPostsData);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/communityFeed")
+    public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@RequestBody SearchCriteria searchCriteria,
+                                                                   @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.searchDiscussionByCommunity(searchCriteria, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
     }
 }
