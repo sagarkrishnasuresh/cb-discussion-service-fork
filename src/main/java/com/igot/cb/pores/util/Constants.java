@@ -28,7 +28,7 @@ public class Constants {
     public static final String FAILED = "Failed";
     public static final String ERROR_MESSAGE = "errmsg";
     public static final String INDEX_TYPE = "_doc";
-    public static final String REDIS_KEY_PREFIX = "cbpores_";
+    public static final String REDIS_KEY_PREFIX = "cb_discussion_";
     public static final String KEYWORD = ".keyword";
     public static final String ASC = "asc";
     public static final String DOT_SEPARATOR = ".";
@@ -197,6 +197,7 @@ public class Constants {
     public static final String UNEXPECTED_PARAMETER = "Unexpected parameter: ";
     public static final String MISSING_PARAMETER = "Missing parameter: ";
     public static final String MISSING_REQUEST_DATA= "Failed Due To Missing Params - requestData is null.";
+    public static final String QUESTION = "question";
 
     private Constants() {
     }
