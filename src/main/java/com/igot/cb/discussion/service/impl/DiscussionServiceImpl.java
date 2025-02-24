@@ -791,11 +791,14 @@ public class DiscussionServiceImpl implements DiscussionService {
             cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.POST_REPORTED_BY_USER, userReportData);
 
             // Update the status of the discussion in Cassandra
-            List<Map<String, Object>> reportedByUsers = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-                    Constants.KEYSPACE_SUNBIRD, Constants.POST_REPORTED_BY_USER, Collections.singletonMap(Constants.DISCUSSION_ID, discussionId), null, null);
-
-            int reportCount = reportedByUsers.size();
-            String status = reportCount >= cbServerProperties.getReportPostUserLimit() ? Constants.SUSPENDED : Constants.REPORTED;
+            String status ;
+            if (cbServerProperties.isDiscussionReportHidePost()) {
+                List<Map<String, Object>> reportedByUsers = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                        Constants.KEYSPACE_SUNBIRD, Constants.POST_REPORTED_BY_USER, Collections.singletonMap(Constants.DISCUSSION_ID, discussionId), null, null);
+                status = reportedByUsers.size() >= cbServerProperties.getReportPostUserLimit() ? Constants.SUSPENDED : Constants.REPORTED;
+            } else {
+                status = Constants.REPORTED;
+            }
 
             Map<String, Object> statusUpdateData = new HashMap<>();
             statusUpdateData.put(Constants.STATUS, status);
@@ -1254,6 +1257,9 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String,Object> filterCriteria = new HashMap<>();
             filterCriteria.put(Constants.COMMUNITY_ID, searchData.get(Constants.COMMUNITY_ID));
             filterCriteria.put(Constants.TYPE, Constants.QUESTION);
+            filterCriteria.put(Constants.STATUS, Arrays.asList(Constants.ACTIVE, Constants.REPORTED));
+            filterCriteria.put(Constants.IS_ACTIVE, true);
+
             searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
             List<Map<String, Object>> discussions = searchResult.getData();
