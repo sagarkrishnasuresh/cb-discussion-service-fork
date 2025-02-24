@@ -1254,6 +1254,12 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String,Object> filterCriteria = new HashMap<>();
             filterCriteria.put(Constants.COMMUNITY_ID, searchData.get(Constants.COMMUNITY_ID));
             filterCriteria.put(Constants.TYPE, Constants.QUESTION);
+            if (cbServerProperties.isDiscussionReportHidePost()){
+                filterCriteria.put(Constants.STATUS,Arrays.asList(Constants.ACTIVE,Constants.REPORTED));
+            }else {
+                filterCriteria.put(Constants.STATUS,Arrays.asList(Constants.ACTIVE,Constants.REPORTED,Constants.SUSPENDED));
+            }
+            filterCriteria.put(Constants.IS_ACTIVE, true);
             searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
             List<Map<String, Object>> discussions = searchResult.getData();

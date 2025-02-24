@@ -48,4 +48,7 @@ public class CbServerProperties {
 
   @Value("${discussion.feed.redis.ttl}")
   private long discussionFeedRedisTtl;
+
+  @Value("${discussion.report.hide.post}")
+  private boolean discussionReportHidePost;
 }
