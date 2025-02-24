@@ -1116,6 +1116,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             } else {
                 Map<String, Object> properties = new HashMap<>();
                 properties.put(Constants.USERID, userId);
+                properties.put(Constants.COMMUNITY_ID, requestData.get(Constants.COMMUNITY_ID));
                 List<Map<String, Object>> bookmarkedDiscussions = cassandraOperation.getRecordsByPropertiesWithoutFiltering(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.DISCUSSION_ID), null);
                 if (bookmarkedDiscussions.isEmpty()) {
                     return returnErrorMsg(Constants.NO_DISCUSSIONS_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
