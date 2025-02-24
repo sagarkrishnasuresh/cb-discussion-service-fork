@@ -83,7 +83,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Value("${kafka.topic.community.discusion.post.count}")
     private String communityPostCount;
 
-    //@PostConstruct
+    @PostConstruct
     public void init() {
         if (storageService == null) {
             storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
