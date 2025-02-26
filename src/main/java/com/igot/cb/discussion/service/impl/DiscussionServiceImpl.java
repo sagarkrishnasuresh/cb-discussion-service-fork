@@ -83,7 +83,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Value("${kafka.topic.community.discusion.post.count}")
     private String communityPostCount;
 
-    //@PostConstruct
+    @PostConstruct
     public void init() {
         if (storageService == null) {
             storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
@@ -373,9 +373,10 @@ public class DiscussionServiceImpl implements DiscussionService {
                         response.setMessage(Constants.DELETED_SUCCESSFULLY);
                         response.getParams().setStatus(Constants.SUCCESS);
                         Map<String, String> communityObject = new HashMap<>();
-                        communityObject.put(Constants.COMMUNITY_ID, entityOptional.get().getDiscussionId());
+                        communityObject.put(Constants.COMMUNITY_ID,
+                            (String) map.get(Constants.COMMUNITY_ID));
                         communityObject.put(Constants.STATUS, Constants.DECREMENT);
-                        if (Constants.POST.equalsIgnoreCase(data.get(Constants.TYPE).asText())){
+                        if (Constants.QUESTION.equalsIgnoreCase(data.get(Constants.TYPE).asText())){
                             communityObject.put(Constants.TYPE, Constants.POST);
                         }else {
                             communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
