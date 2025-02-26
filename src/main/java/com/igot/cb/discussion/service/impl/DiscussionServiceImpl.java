@@ -83,7 +83,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Value("${kafka.topic.community.discusion.post.count}")
     private String communityPostCount;
 
-    @PostConstruct
+    //@PostConstruct
     public void init() {
         if (storageService == null) {
             storageService = StorageServiceFactory.getStorageService(new StorageConfig(cbServerProperties.getCloudStorageTypeName(), cbServerProperties.getCloudStorageKey(), cbServerProperties.getCloudStorageSecret().replace("\\n", "\n"), Option.apply(cbServerProperties.getCloudStorageEndpoint()), Option.empty()));
@@ -374,7 +374,12 @@ public class DiscussionServiceImpl implements DiscussionService {
                         response.getParams().setStatus(Constants.SUCCESS);
                         Map<String, String> communityObject = new HashMap<>();
                         communityObject.put(Constants.COMMUNITY_ID, entityOptional.get().getDiscussionId());
-                        communityObject.put(Constants.STATUS, Constants.INCREMENT);
+                        communityObject.put(Constants.STATUS, Constants.DECREMENT);
+                        if (Constants.POST.equalsIgnoreCase(data.get(Constants.TYPE).asText())){
+                            communityObject.put(Constants.TYPE, Constants.POST);
+                        }else {
+                            communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
+                        }
                         producer.push(communityPostCount, communityObject);
                         return response;
                     } else {
@@ -680,6 +685,12 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
             deleteCacheByCommunity(answerPostData.get(Constants.COMMUNITY_ID).asText());
+            Map<String, String> communityObject = new HashMap<>();
+            communityObject.put(Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText());
+            communityObject.put(Constants.STATUS, Constants.INCREMENT);
+            communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
+            producer.push(communityPostCount, communityObject);
+
             //updateCacheForFirstFivePages(answerPostData.get(Constants.COMMUNITY_ID).asText());
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
