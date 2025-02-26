@@ -1,36 +1,43 @@
 package com.igot.cb.pores.util;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.igot.cb.pores.exceptions.CustomException;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.ValidationMessage;
-import lombok.extern.slf4j.Slf4j;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.io.InputStream;
-import java.util.Set;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.igot.cb.pores.exceptions.CustomException;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.ValidationMessage;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 public class PayloadValidation {
 
+  @Autowired
+  JsonSchemaCache schemaCache;
+
   private Logger logger = LoggerFactory.getLogger(PayloadValidation.class);
 
-  public void validatePayload(String fileName, JsonNode payload) {
-//    log.info("PayloadValidation::validatePayload:inside");
+  public void validatePayload(String schemaKey, JsonNode payload) {
     try {
-      JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance();
-      InputStream schemaStream = schemaFactory.getClass().getResourceAsStream(fileName);
-      JsonSchema schema = schemaFactory.getSchema(schemaStream);
+      JsonSchema schema = schemaCache.getSchema(schemaKey);
+
+      if (schema == null) {
+        String errorMsg = String.format("Schema not found for key: %s", schemaKey);
+        throw new CustomException(errorMsg, errorMsg, HttpStatus.BAD_REQUEST);
+      }
+
       if (payload.isArray()) {
         for (JsonNode objectNode : payload) {
           validateObject(schema, objectNode);
         }
-      } else{
+      } else {
         validateObject(schema, payload);
       }
     } catch (Exception e) {
@@ -51,4 +58,3 @@ public class PayloadValidation {
     }
   }
 }
-

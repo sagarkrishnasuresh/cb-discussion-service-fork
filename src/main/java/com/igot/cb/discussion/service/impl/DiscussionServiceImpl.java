@@ -100,7 +100,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     public ApiResponse createDiscussion(JsonNode discussionDetails, String token) {
         log.info("DiscussionService::createDiscussion:creating discussion");
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.create");
-        payloadValidation.validatePayload(Constants.DISCUSSION_VALIDATION_FILE, discussionDetails);
+        payloadValidation.validatePayload(Constants.DISCUSSION_VALIDATION_SCHEMA, discussionDetails);
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
             response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
@@ -235,7 +235,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     public ApiResponse updateDiscussion(JsonNode updateData, String token) {
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("update.Discussion");
-        payloadValidation.validatePayload(Constants.DISCUSSION_UPDATE_VALIDATION_FILE, updateData);
+        payloadValidation.validatePayload(Constants.DISCUSSION_UPDATE_VALIDATION_SCHEMA, updateData);
         try {
             updateMetricsApiCall(Constants.DISCUSSION_UPDATE);
             String discussionId = updateData.get(Constants.DISCUSSION_ID).asText();
@@ -614,7 +614,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     public ApiResponse createAnswerPost(JsonNode answerPostData, String token) {
         log.info("DiscussionService::createAnswerPost:creating answerPost");
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.createAnswerPost");
-        payloadValidation.validatePayload(Constants.DISCUSSION_ANSWER_POST_VALIDATION_FILE, answerPostData);
+        payloadValidation.validatePayload(Constants.DISCUSSION_ANSWER_POST_VALIDATION_SCHEMA, answerPostData);
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
             response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
@@ -949,7 +949,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     public ApiResponse updateAnswerPost(JsonNode answerPostData, String token) {
         log.info("DiscussionService::updateAnswerPost:updating answerPost");
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.updateAnswerPost");
-        payloadValidation.validatePayload(Constants.ANSWER_POST_UPDATE_VALIDATION_FILE, answerPostData);
+        payloadValidation.validatePayload(Constants.ANSWER_POST_UPDATE_VALIDATION_SCHEMA, answerPostData);
         String userId = accessTokenValidator.verifyUserToken(token);
         if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
             response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
