@@ -5,9 +5,6 @@ import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.Arrays;
-import java.util.List;
-
 @Component
 @Getter
 @Setter
@@ -42,4 +39,13 @@ public class CbServerProperties {
 
   @Value("${report.post.user.limit}")
   private int reportPostUserLimit;
+
+  @Value("${discussion.es.defaultPageSize}")
+  private int discussionEsDefaultPageSize;
+
+  @Value("${discussion.feed.redis.ttl}")
+  private long discussionFeedRedisTtl;
+
+  @Value("${discussion.report.hide.post}")
+  private boolean discussionReportHidePost;
 }

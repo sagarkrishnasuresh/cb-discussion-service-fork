@@ -28,7 +28,7 @@ public class Constants {
     public static final String FAILED = "Failed";
     public static final String ERROR_MESSAGE = "errmsg";
     public static final String INDEX_TYPE = "_doc";
-    public static final String REDIS_KEY_PREFIX = "cbpores_";
+    public static final String REDIS_KEY_PREFIX = "cb_discussion_";
     public static final String KEYWORD = ".keyword";
     public static final String ASC = "asc";
     public static final String DOT_SEPARATOR = ".";
@@ -66,12 +66,10 @@ public class Constants {
     public static final String USER = "user";
     public static final String UNKNOWN_IDENTIFIER = "Unknown identifier ";
     public static final String EXCEPTION_MSG_UPDATE = "Exception occurred while updating record to ";
-    public static final String DISCUSSION_VALIDATION_FILE = "/payloadValidation/discussionValidation.json";
     public static final String FAILED_TO_CREATE_DISCUSSION = "Failed to create the discussion";
     public static final String SEARCH_RESULTS = "search_results";
     public static final String DISCUSSION_ID = "discussionId";
     public static final  String DISCUSSION_IS_NOT_ACTIVE = "Discussion is not active";
-    public static final String DISCUSSION_UPDATE_VALIDATION_FILE ="/payloadValidation/discussionUpdateValidation.json";
     public static final String USER_DISCUSSION_VOTES = "user_discussion_votes";
     public static final String DISCUSSION_ID_KEY = "discussionid";
     public static final String EXCEPTION_MSG_DELETE = "Exception occurred while deleting record from ";
@@ -120,7 +118,6 @@ public class Constants {
     public static final String EMPLOYMENT_DETAILS = "employmentDetails";
     public static final String DEPARTMENT_KEY = "departmentName";
     public static final String DEPARTMENT = "department";
-    public static final String DISCUSSION_ANSWER_POST_VALIDATION_FILE = "/payloadValidation/discussionAnswerPostValidation.json";
     public static final String PARENT_DISCUSSION_ID = "parentDiscussionId";
     public static final String FAILED_TO_CREATE_ANSWER_POST = "Failed to create the answer post";
     public static final String INVALID_PARENT_DISCUSSION_ID = "invalid Parent Discussion Id Please provide a valid discussion id";
@@ -167,7 +164,6 @@ public class Constants {
     public static final String ANSWER_POST_ID = "answerPostId";
     public static final String INVALID_ANSWER_POST_ID = "Invalid answerPostId";
     public static final String FAILED_TO_UPDATE_ANSWER_POST = "Failed to update the answer post";
-    public static final String ANSWER_POST_UPDATE_VALIDATION_FILE = "/payloadValidation/answerPostUpdateValidation.json";
     public static final String INCREMENT = "increment";
     public static final String DECREMENT = "decrement";
     public static final String POST = "post";
@@ -197,6 +193,12 @@ public class Constants {
     public static final String UNEXPECTED_PARAMETER = "Unexpected parameter: ";
     public static final String MISSING_PARAMETER = "Missing parameter: ";
     public static final String MISSING_REQUEST_DATA= "Failed Due To Missing Params - requestData is null.";
+    public static final String QUESTION = "question";
+    public static final String DISCUSSION_VALIDATION_SCHEMA = "discussionValidation";
+    public static final String DISCUSSION_UPDATE_VALIDATION_SCHEMA ="discussionUpdateValidation";
+    public static final String DISCUSSION_ANSWER_POST_VALIDATION_SCHEMA = "discussionAnswerPostValidation";
+    public static final String ANSWER_POST_UPDATE_VALIDATION_SCHEMA = "answerPostUpdateValidation";
+    public static final String TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 
     private Constants() {
     }

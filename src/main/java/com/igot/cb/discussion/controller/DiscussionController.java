@@ -40,9 +40,8 @@ public class DiscussionController {
     }
 
     @PostMapping("/search")
-    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria,
-                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
-        ApiResponse response = discussionService.searchDiscussion(searchCriteria,token);
+    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria){
+        ApiResponse response = discussionService.searchDiscussion(searchCriteria);
         return new ResponseEntity<>(response,response.getResponseCode());
     }
 
@@ -119,9 +118,8 @@ public class DiscussionController {
     }
 
     @PostMapping("/communityFeed")
-    public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@RequestBody SearchCriteria searchCriteria,
-                                                                   @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-        ApiResponse response = discussionService.searchDiscussionByCommunity(searchCriteria, token);
+    public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@RequestBody Map<String, Object> searchData) {
+        ApiResponse response = discussionService.searchDiscussionByCommunity(searchData);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 }
