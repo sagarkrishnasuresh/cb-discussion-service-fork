@@ -379,8 +379,14 @@ public class DiscussionServiceImpl implements DiscussionService {
                         response.setMessage(Constants.DELETED_SUCCESSFULLY);
                         response.getParams().setStatus(Constants.SUCCESS);
                         Map<String, String> communityObject = new HashMap<>();
-                        communityObject.put(Constants.COMMUNITY_ID, entityOptional.get().getDiscussionId());
-                        communityObject.put(Constants.STATUS, Constants.INCREMENT);
+                        communityObject.put(Constants.COMMUNITY_ID,
+                            (String) map.get(Constants.COMMUNITY_ID));
+                        communityObject.put(Constants.STATUS, Constants.DECREMENT);
+                        if (Constants.QUESTION.equalsIgnoreCase(data.get(Constants.TYPE).asText())){
+                            communityObject.put(Constants.TYPE, Constants.POST);
+                        }else {
+                            communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
+                        }
                         producer.push(communityPostCount, communityObject);
                         return response;
                     } else {
@@ -686,6 +692,12 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
             deleteCacheByCommunity(answerPostData.get(Constants.COMMUNITY_ID).asText());
+            Map<String, String> communityObject = new HashMap<>();
+            communityObject.put(Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText());
+            communityObject.put(Constants.STATUS, Constants.INCREMENT);
+            communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
+            producer.push(communityPostCount, communityObject);
+
             //updateCacheForFirstFivePages(answerPostData.get(Constants.COMMUNITY_ID).asText());
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
