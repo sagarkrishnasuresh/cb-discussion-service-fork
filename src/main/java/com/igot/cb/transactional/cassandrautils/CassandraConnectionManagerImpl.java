@@ -72,7 +72,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
             logClusterDetails(cluster);
         } catch (Exception e) {
             logger.error("Error creating Cassandra connection", e);
-            throw new CustomException("Internal Server Error", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            //throw new CustomException("Internal Server Error", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

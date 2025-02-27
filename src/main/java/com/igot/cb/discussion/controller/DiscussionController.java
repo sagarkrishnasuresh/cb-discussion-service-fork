@@ -40,9 +40,8 @@ public class DiscussionController {
     }
 
     @PostMapping("/search")
-    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria,
-                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token){
-        ApiResponse response = discussionService.searchDiscussion(searchCriteria,token);
+    public ResponseEntity<ApiResponse> searchDiscussion(@RequestBody SearchCriteria searchCriteria){
+        ApiResponse response = discussionService.searchDiscussion(searchCriteria);
         return new ResponseEntity<>(response,response.getResponseCode());
     }
 
