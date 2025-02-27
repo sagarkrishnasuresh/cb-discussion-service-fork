@@ -16,7 +16,7 @@ public interface DiscussionService {
 
     ApiResponse updateDiscussion(JsonNode updateData,String token);
 
-    ApiResponse searchDiscussion(SearchCriteria searchCriteria, String token);
+    ApiResponse searchDiscussion(SearchCriteria searchCriteria);
 
     ApiResponse deleteDiscussion(String discussionId,String token);
 

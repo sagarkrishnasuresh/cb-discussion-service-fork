@@ -42,6 +42,8 @@ import java.time.LocalDate;
 import javax.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.sql.Timestamp;
 import java.util.*;
@@ -129,13 +131,17 @@ public class DiscussionServiceImpl implements DiscussionService {
             discussionDetailsNode.put(Constants.STATUS, Constants.ACTIVE);
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
-            long currentTimeMillis = System.currentTimeMillis();
-            Timestamp currentTime = new Timestamp(currentTimeMillis);
+
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            ZonedDateTime zonedDateTime = currentTime.toInstant().atZone(ZoneId.systemDefault());
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.TIME_FORMAT);
+            String formattedCurrentTime = zonedDateTime.format(formatter);
+
             UUID id = UUIDs.timeBased();
             discussionDetailsNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
-            discussionDetailsNode.put(Constants.CREATED_ON, currentTime.toString());
+            discussionDetailsNode.put(Constants.CREATED_ON, formattedCurrentTime);
             jsonNodeEntity.setIsActive(true);
             discussionDetailsNode.put(Constants.IS_ACTIVE, true);
             jsonNodeEntity.setData(discussionDetailsNode);
@@ -293,7 +299,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
 
     @Override
-    public ApiResponse searchDiscussion(SearchCriteria searchCriteria, String token) {
+    public ApiResponse searchDiscussion(SearchCriteria searchCriteria) {
         log.info("DiscussionServiceImpl::searchDiscussion");
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
