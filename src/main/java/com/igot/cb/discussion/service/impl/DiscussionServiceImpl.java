@@ -42,6 +42,8 @@ import java.time.LocalDate;
 import javax.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.sql.Timestamp;
 import java.util.*;
@@ -129,13 +131,17 @@ public class DiscussionServiceImpl implements DiscussionService {
             discussionDetailsNode.put(Constants.STATUS, Constants.ACTIVE);
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
-            long currentTimeMillis = System.currentTimeMillis();
-            Timestamp currentTime = new Timestamp(currentTimeMillis);
+
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            ZonedDateTime zonedDateTime = currentTime.toInstant().atZone(ZoneId.systemDefault());
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.TIME_FORMAT);
+            String formattedCurrentTime = zonedDateTime.format(formatter);
+
             UUID id = UUIDs.timeBased();
             discussionDetailsNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
-            discussionDetailsNode.put(Constants.CREATED_ON, currentTime.toString());
+            discussionDetailsNode.put(Constants.CREATED_ON, formattedCurrentTime);
             jsonNodeEntity.setIsActive(true);
             discussionDetailsNode.put(Constants.IS_ACTIVE, true);
             jsonNodeEntity.setData(discussionDetailsNode);
@@ -293,7 +299,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
 
     @Override
-    public ApiResponse searchDiscussion(SearchCriteria searchCriteria, String token) {
+    public ApiResponse searchDiscussion(SearchCriteria searchCriteria) {
         log.info("DiscussionServiceImpl::searchDiscussion");
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
@@ -311,7 +317,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
         try {
-
+            if (MapUtils.isEmpty(searchCriteria.getFilterCriteriaMap())) {
+                searchCriteria.setFilterCriteriaMap(new HashMap<>());
+            }
+            searchCriteria.getFilterCriteriaMap().put(Constants.IS_ACTIVE, true);
+            searchCriteria.getFilterCriteriaMap().put(Constants.STATUS, Arrays.asList(Constants.ACTIVE,Constants.REPORTED));
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
             List<Map<String, Object>> discussions = searchResult.getData();
 
@@ -678,6 +688,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             long timer = System.currentTimeMillis();
             discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.INSERT, timer);
+            List<String> searchTags = Arrays.asList(
+                    answerPostData.get(Constants.DESCRIPTION_PAYLOAD).textValue().toLowerCase()
+            );
+            ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
+            answerPostDataNode.put(Constants.SEARCHTAGS, searchTagsArray);
 
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(answerPostDataNode);
