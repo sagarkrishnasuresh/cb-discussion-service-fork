@@ -85,6 +85,9 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Value("${kafka.topic.community.discusion.post.count}")
     private String communityPostCount;
 
+    @Value("${kafka.topic.community.discusion.like.count}")
+    private String communityLikeCount;
+
     @PostConstruct
     public void init() {
         if (storageService == null) {
@@ -458,7 +461,12 @@ public class DiscussionServiceImpl implements DiscussionService {
                 }
                 if (voteType.equals(Constants.UP)) {
                     discussionData.put(Constants.UP_VOTE_COUNT, existingUpVoteCount + 1);
-                    producer.push();
+                    Map<String, String> communityObject = new HashMap<>();
+                    communityObject.put(Constants.COMMUNITY_ID,
+                         discussionDbData.getData().get(Constants.COMMUNITY_ID).asText());
+                    communityObject.put(Constants.STATUS, Constants.INCREMENT);
+                    communityObject.put(Constants.DISCUSSION_ID, discussionId);
+                    producer.push(communityLikeCount, communityObject);
                 } else {
                     discussionData.put(Constants.DOWN_VOTE_COUNT, existingDownVoteCount + 1);
                 }
