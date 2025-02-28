@@ -326,7 +326,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
-                discussions = fetchAndEnhanceDiscussions(discussions);
+                boolean isAnswerPost = false;
+                if (searchCriteria.getFilterCriteriaMap().containsKey(Constants.TYPE) && Constants.ANSWER_POST.equals(searchCriteria.getFilterCriteriaMap().get(Constants.TYPE))) {
+                    isAnswerPost = true;
+                }
+                fetchAndEnhanceDiscussions(discussions, isAnswerPost);
             }
 
             searchResult.setData(discussions);
@@ -1178,7 +1182,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             if (searchResult == null) {
                 searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
                 List<Map<String, Object>> data = searchResult.getData();
-                data = fetchAndEnhanceDiscussions(data);
+                fetchAndEnhanceDiscussions(data,false);
                 searchResult.setData(data);
                 redisTemplate.opsForValue().set(generateRedisJwtTokenKey(searchCriteria), searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
             }
@@ -1216,16 +1220,35 @@ public class DiscussionServiceImpl implements DiscussionService {
         return errorMsg.toString();
     }
 
-    private List<Map<String, Object>> fetchAndEnhanceDiscussions(List<Map<String, Object>> discussions) {
+    private void fetchAndEnhanceDiscussions(List<Map<String, Object>> discussions, boolean isAnswerPost) {
         Map<String, String> discussionToCreatedByMap = discussions.stream()
                 .collect(Collectors.toMap(
                         discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
                         discussion -> discussion.get(Constants.CREATED_BY).toString()));
 
+        Map<String, List<String>> discussionToUserTagMap = new HashMap<>();
+        if (isAnswerPost) {
+            discussionToUserTagMap.putAll(discussions.stream()
+                    .filter(discussion -> discussion.containsKey(Constants.TAGGED_USER))
+                    .collect(Collectors.toMap(
+                            discussion -> discussion.get(Constants.DISCUSSION_ID).toString(),
+                            discussion -> (List<String>) discussion.get(Constants.TAGGED_USER))));
+        }
+
         Set<String> createdByIds = new HashSet<>(discussionToCreatedByMap.values());
+        Set<String> userTagIds = new HashSet<>();
+        if (!discussionToUserTagMap.isEmpty()) {
+            userTagIds = discussionToUserTagMap.values().stream()
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toSet());
+        }
+        Set<String> allUserIds = new HashSet<>();
+        allUserIds.addAll(createdByIds);
+        allUserIds.addAll(userTagIds);
+
         long userDataRedisTime = System.currentTimeMillis();
         List<Object> redisResults = fetchDataForKeys(
-                createdByIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
+                allUserIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
         );
         updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.READ, userDataRedisTime);
         Map<String, Object> userDetailsMap = redisResults.stream()
@@ -1234,7 +1257,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         user -> user.get(Constants.USER_ID_KEY).toString(),
                         user -> user));
 
-        List<String> missingUserIds = createdByIds.stream()
+        List<String> missingUserIds = allUserIds.stream()
                 .filter(id -> !userDetailsMap.containsKey(id))
                 .collect(Collectors.toList());
 
@@ -1247,16 +1270,22 @@ public class DiscussionServiceImpl implements DiscussionService {
                             user -> user)));
         }
 
-        List<Map<String, Object>> filteredDiscussions = new ArrayList<>();
-        for (Map<String, Object> discussion : discussions) {
+        discussions.forEach(discussion -> {
             String discussionId = discussion.get(Constants.DISCUSSION_ID).toString();
             String createdById = discussionToCreatedByMap.get(discussionId);
-            if (createdById != null && userDetailsMap.containsKey(createdById)) {
+            List<String> userTagIdsList = discussionToUserTagMap.get(discussionId);
+            boolean hasCreatedBy = createdById != null && userDetailsMap.containsKey(createdById);
+            if (hasCreatedBy) {
                 discussion.put(Constants.CREATED_BY, userDetailsMap.get(createdById));
-                filteredDiscussions.add(discussion);
             }
-        }
-        return filteredDiscussions;
+            if (isAnswerPost && userTagIdsList != null && !userTagIdsList.isEmpty()) {
+                List<Object> userTags = userTagIdsList.stream()
+                        .filter(userDetailsMap::containsKey)
+                        .map(userDetailsMap::get)
+                        .collect(Collectors.toList());
+                discussion.put(Constants.TAGGED_USER, userTags);
+            }
+        });
     }
 
     @Override
@@ -1292,7 +1321,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
-                discussions = fetchAndEnhanceDiscussions(discussions);
+                fetchAndEnhanceDiscussions(discussions,false);
             }
 
             searchResult.setData(discussions);
@@ -1374,7 +1403,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
-                discussions = fetchAndEnhanceDiscussions(discussions);
+                fetchAndEnhanceDiscussions(discussions,false);
             }
             String cacheKeyPrefix = Constants.DISCUSSION_CACHE_PREFIX + communityId + "_";
 

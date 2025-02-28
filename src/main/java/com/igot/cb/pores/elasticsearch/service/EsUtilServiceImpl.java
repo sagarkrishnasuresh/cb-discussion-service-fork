@@ -137,10 +137,15 @@ public class EsUtilServiceImpl implements EsUtilService {
 
     @Override
     public SearchResult searchDocuments(String esIndexName, SearchCriteria searchCriteria) {
-        SearchSourceBuilder searchSourceBuilder = buildSearchSourceBuilder(searchCriteria);
-        SearchRequest searchRequest = new SearchRequest(esIndexName);
-        searchRequest.source(searchSourceBuilder);
         try {
+            SearchResult searchResult = new SearchResult();
+            boolean indexExists = elasticsearchClient.indices().exists(new GetIndexRequest(esIndexName), RequestOptions.DEFAULT);
+            if (!indexExists) {
+                return searchResult;
+            }
+            SearchSourceBuilder searchSourceBuilder = buildSearchSourceBuilder(searchCriteria);
+            SearchRequest searchRequest = new SearchRequest(esIndexName);
+            searchRequest.source(searchSourceBuilder);
             if (searchSourceBuilder != null) {
                 int pageNumber = searchCriteria.getPageNumber();
                 int pageSize = searchCriteria.getPageSize();
@@ -155,7 +160,6 @@ public class EsUtilServiceImpl implements EsUtilService {
             List<Map<String, Object>> paginatedResult = extractPaginatedResult(paginatedSearchResponse);
             Map<String, List<FacetDTO>> fieldAggregations =
                     extractFacetData(paginatedSearchResponse, searchCriteria);
-            SearchResult searchResult = new SearchResult();
             searchResult.setData(paginatedResult);
             searchResult.setFacets(fieldAggregations);
             searchResult.setTotalCount(paginatedSearchResponse.getHits().getTotalHits().value);

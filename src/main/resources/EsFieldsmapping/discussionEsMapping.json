@@ -58,6 +58,9 @@
   "categoryType": {
     "type": "keyword"
   },
+  "taggedUser": {
+      "type": "keyword"
+  },
   "mediaCategory": {
     "properties": {
       "document": {

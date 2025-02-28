@@ -199,6 +199,7 @@ public class Constants {
     public static final String DISCUSSION_ANSWER_POST_VALIDATION_SCHEMA = "discussionAnswerPostValidation";
     public static final String ANSWER_POST_UPDATE_VALIDATION_SCHEMA = "answerPostUpdateValidation";
     public static final String TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+    public static final String TAGGED_USER = "taggedUser";
 
     private Constants() {
     }
