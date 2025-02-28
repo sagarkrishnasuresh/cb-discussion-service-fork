@@ -448,6 +448,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 }
                 if (voteType.equals(Constants.UP)) {
                     discussionData.put(Constants.UP_VOTE_COUNT, existingUpVoteCount + 1);
+                    producer.push();
                 } else {
                     discussionData.put(Constants.DOWN_VOTE_COUNT, existingDownVoteCount + 1);
                 }
