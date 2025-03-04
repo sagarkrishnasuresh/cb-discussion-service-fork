@@ -272,9 +272,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             updateDataNode.remove(Constants.DISCUSSION_ID);
             data.setAll(updateDataNode);
 
-            long currentTimeMillis = System.currentTimeMillis();
-            Timestamp currentTime = new Timestamp(currentTimeMillis);
-            data.put(Constants.UPDATED_ON, String.valueOf(currentTime));
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            data.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
             discussionDbData.setUpdatedOn(currentTime);
             discussionDbData.setData(data);
             long postgresInsertTime = System.currentTimeMillis();
@@ -688,13 +687,13 @@ public class DiscussionServiceImpl implements DiscussionService {
             answerPostDataNode.put(Constants.PARENT_DISCUSSION_ID, answerPostData.get(Constants.PARENT_DISCUSSION_ID));
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
-            long currentTimeMillis = System.currentTimeMillis();
-            Timestamp currentTime = new Timestamp(currentTimeMillis);
+
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             UUID id = UUIDs.timeBased();
             answerPostDataNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
-            answerPostDataNode.put(Constants.CREATED_ON, currentTime.toString());
+            answerPostDataNode.put(Constants.CREATED_ON, getFormattedCurrentTime(currentTime));
             jsonNodeEntity.setIsActive(true);
             answerPostDataNode.put(Constants.IS_ACTIVE, true);
             jsonNodeEntity.setData(answerPostDataNode);
@@ -1017,9 +1016,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode answerPostDataNode = (ObjectNode) answerPostData;
             answerPostDataNode.remove(Constants.ANSWER_POST_ID);
             //answerPostDataNode.put("updatedBy", userId);
-            long currentTimeMillis = System.currentTimeMillis();
-            Timestamp currentTime = new Timestamp(currentTimeMillis);
-            answerPostDataNode.put(Constants.UPDATED_ON, currentTime.toString());
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            answerPostDataNode.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
             discussionEntity.setUpdatedOn(currentTime);
             data.setAll(answerPostDataNode);
             discussionEntity.setData(data);
@@ -1435,5 +1433,11 @@ public class DiscussionServiceImpl implements DiscussionService {
         } catch (Exception e) {
             log.error("Error while updating cache for community {}: {}", communityId, e.getMessage(), e);
         }
+    }
+
+    private String getFormattedCurrentTime(Timestamp currentTime) {
+        ZonedDateTime zonedDateTime = currentTime.toInstant().atZone(ZoneId.systemDefault());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.TIME_FORMAT);
+        return zonedDateTime.format(formatter);
     }
 }
