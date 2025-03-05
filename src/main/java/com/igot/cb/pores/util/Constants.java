@@ -200,6 +200,7 @@ public class Constants {
     public static final String ANSWER_POST_UPDATE_VALIDATION_SCHEMA = "answerPostUpdateValidation";
     public static final String TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
     public static final String TAGGED_USER = "taggedUser";
+    public static final String NUMBER = "number";
 
     private Constants() {
     }

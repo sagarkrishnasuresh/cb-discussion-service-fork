@@ -49,9 +49,6 @@
   "status": {
     "type": "keyword"
   },
-  "searchTags": {
-    "type": "keyword"
-  },
   "reportedBy": {
     "type": "keyword"
   },
