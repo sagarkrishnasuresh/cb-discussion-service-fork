@@ -338,11 +338,11 @@ public class EsUtilServiceImpl implements EsUtilService {
         if (match) {
                 queryBuilder.should(QueryBuilders
                         .regexpQuery(propertyName,
-                                ".*" + values.toLowerCase() + ".*"));
+                                ".*" + values + ".*"));
             } else {
                 queryBuilder.mustNot(QueryBuilders
                         .regexpQuery(propertyName,
-                                ".*" + values.toLowerCase() + ".*"));
+                                ".*" + values + ".*"));
             }
 
         return queryBuilder;
