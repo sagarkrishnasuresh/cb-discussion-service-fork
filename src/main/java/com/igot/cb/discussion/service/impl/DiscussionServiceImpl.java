@@ -319,7 +319,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             searchCriteria.getFilterCriteriaMap().put(Constants.IS_ACTIVE, true);
             searchCriteria.getFilterCriteriaMap().put(Constants.STATUS, Arrays.asList(Constants.ACTIVE,Constants.REPORTED));
-            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria,cbServerProperties.getElasticDiscussionJsonPath());
+            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {

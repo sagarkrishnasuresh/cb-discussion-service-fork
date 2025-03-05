@@ -11,6 +11,7 @@ import com.igot.cb.pores.exceptions.CustomException;
 import com.igot.cb.pores.util.Constants;
 import com.networknt.schema.JsonSchemaFactory;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -69,7 +70,7 @@ public class EsUtilServiceImpl implements EsUtilService {
 
         try {
             Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
-            if (schemaMap == null) {
+            if (MapUtils.isEmpty(schemaMap)) {
                 throw new CustomException("Failed to read JSON schema", "Schema reading error", HttpStatus.INTERNAL_SERVER_ERROR);
             }
 
@@ -98,7 +99,7 @@ public class EsUtilServiceImpl implements EsUtilService {
         log.info("EsUtilServiceImpl :: updateDocument");
         try {
             Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
-            if (schemaMap == null) {
+            if (MapUtils.isEmpty(schemaMap)) {
                 throw new CustomException("Failed to read JSON schema", "Schema reading error", HttpStatus.INTERNAL_SERVER_ERROR);
             }
 
@@ -299,14 +300,14 @@ public class EsUtilServiceImpl implements EsUtilService {
             SortOrder sortOrder =
                     Constants.ASC.equals(searchCriteria.getOrderDirection()) ? SortOrder.ASC : SortOrder.DESC;
             Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
-           Map<String, Object> fieldMap =(Map<String, Object>) schemaMap.get(searchCriteria.getOrderBy());
-           if(fieldMap.get(Constants.TYPE).equals(Constants.NUMBER)){
-               searchSourceBuilder.sort(
-                       SortBuilders.fieldSort(searchCriteria.getOrderBy()).order(sortOrder));
-           }else {
-               searchSourceBuilder.sort(
-                       SortBuilders.fieldSort(searchCriteria.getOrderBy() + Constants.KEYWORD).order(sortOrder));
-           }
+            Map<String, Object> fieldMap = (Map<String, Object>) schemaMap.get(searchCriteria.getOrderBy());
+            if (MapUtils.isNotEmpty(fieldMap) && fieldMap.get(Constants.TYPE).equals(Constants.NUMBER)) {
+                searchSourceBuilder.sort(
+                        SortBuilders.fieldSort(searchCriteria.getOrderBy()).order(sortOrder));
+            } else {
+                searchSourceBuilder.sort(
+                        SortBuilders.fieldSort(searchCriteria.getOrderBy() + Constants.KEYWORD).order(sortOrder));
+            }
         }
     }
 
