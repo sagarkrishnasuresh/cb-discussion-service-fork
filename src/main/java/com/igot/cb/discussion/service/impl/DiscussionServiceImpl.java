@@ -151,15 +151,9 @@ public class DiscussionServiceImpl implements DiscussionService {
             long postgresTime = System.currentTimeMillis();
             DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.INSERT, postgresTime);
-
-            List<String> searchTags = Arrays.asList(
-                    discussionDetails.get(Constants.DESCRIPTION_PAYLOAD).textValue().toLowerCase()
-            );
-            ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(discussionDetailsNode);
-            jsonNode.put(Constants.SEARCHTAGS, searchTagsArray);
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            Map<String, Object> map = objectMapper.convertValue(discussionDetailsNode, Map.class);
 
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
@@ -325,7 +319,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             searchCriteria.getFilterCriteriaMap().put(Constants.IS_ACTIVE, true);
             searchCriteria.getFilterCriteriaMap().put(Constants.STATUS, Arrays.asList(Constants.ACTIVE,Constants.REPORTED));
-            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria,cbServerProperties.getElasticDiscussionJsonPath());
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
@@ -700,11 +694,6 @@ public class DiscussionServiceImpl implements DiscussionService {
             long timer = System.currentTimeMillis();
             discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.INSERT, timer);
-            List<String> searchTags = Arrays.asList(
-                    answerPostData.get(Constants.DESCRIPTION_PAYLOAD).textValue().toLowerCase()
-            );
-            ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
-            answerPostDataNode.put(Constants.SEARCHTAGS, searchTagsArray);
 
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(answerPostDataNode);
@@ -1188,7 +1177,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             SearchResult searchResult = redisTemplate.opsForValue().get(generateRedisJwtTokenKey(searchCriteria));
             if (searchResult == null) {
-                searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+                searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
                 List<Map<String, Object>> data = searchResult.getData();
                 fetchAndEnhanceDiscussions(data,false);
                 searchResult.setData(data);
@@ -1325,7 +1314,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             filterCriteria.put(Constants.IS_ACTIVE, true);
 
             searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
-            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+            searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
@@ -1407,7 +1396,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
 
         try {
-            SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria);
+            SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {

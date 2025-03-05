@@ -42,13 +42,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
 public class EsUtilServiceImpl implements EsUtilService {
 
-    /*@Autowired
-    private RestHighLevelClient elasticsearchClient;*/
+    private static final Map<String, Map<String, Object>> schemaCache = new ConcurrentHashMap<>();
     private final EsConfig esConfig;
     private final RestHighLevelClient elasticsearchClient;
 
@@ -67,16 +67,17 @@ public class EsUtilServiceImpl implements EsUtilService {
             String esIndexName, String type, String id, Map<String, Object> document, String JsonFilePath) {
         log.info("EsUtilServiceImpl :: addDocument");
 
-        try(InputStream schemaStream = JsonSchemaFactory.getInstance().getClass().getResourceAsStream(JsonFilePath)) {
+        try {
+            Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
+            if (schemaMap == null) {
+                throw new CustomException("Failed to read JSON schema", "Schema reading error", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
 
-            Map<String, Object> map = objectMapper.readValue(schemaStream,
-                    new TypeReference<Map<String, Object>>() {
-                    });
             Iterator<Entry<String, Object>> iterator = document.entrySet().iterator();
             while (iterator.hasNext()) {
                 Entry<String, Object> entry = iterator.next();
                 String key = entry.getKey();
-                if (!map.containsKey(key)) {
+                if (!schemaMap.containsKey(key)) {
                     iterator.remove();
                 }
             }
@@ -94,17 +95,18 @@ public class EsUtilServiceImpl implements EsUtilService {
     @Override
     public RestStatus updateDocument(
             String index, String indexType, String entityId, Map<String, Object> updatedDocument, String JsonFilePath) {
+        log.info("EsUtilServiceImpl :: updateDocument");
         try {
-            JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance();
-            InputStream schemaStream = schemaFactory.getClass().getResourceAsStream(JsonFilePath);
-            Map<String, Object> map = objectMapper.readValue(schemaStream,
-                    new TypeReference<Map<String, Object>>() {
-                    });
+            Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
+            if (schemaMap == null) {
+                throw new CustomException("Failed to read JSON schema", "Schema reading error", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+
             Iterator<Entry<String, Object>> iterator = updatedDocument.entrySet().iterator();
             while (iterator.hasNext()) {
                 Entry<String, Object> entry = iterator.next();
                 String key = entry.getKey();
-                if (!map.containsKey(key)) {
+                if (!schemaMap.containsKey(key)) {
                     iterator.remove();
                 }
             }
@@ -114,8 +116,10 @@ public class EsUtilServiceImpl implements EsUtilService {
                             .source(updatedDocument)
                             .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
             IndexResponse response = elasticsearchClient.index(indexRequest, RequestOptions.DEFAULT);
+            log.info("EsUtilServiceImpl :: updateDocument :Update response {}", response.status());
             return response.status();
-        } catch (IOException e) {
+        } catch (Exception e) {
+            log.error("Issue while updating document in es: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -136,14 +140,14 @@ public class EsUtilServiceImpl implements EsUtilService {
     }
 
     @Override
-    public SearchResult searchDocuments(String esIndexName, SearchCriteria searchCriteria) {
+    public SearchResult searchDocuments(String esIndexName, SearchCriteria searchCriteria, String JsonFilePath) {
         try {
             SearchResult searchResult = new SearchResult();
             boolean indexExists = elasticsearchClient.indices().exists(new GetIndexRequest(esIndexName), RequestOptions.DEFAULT);
             if (!indexExists) {
                 return searchResult;
             }
-            SearchSourceBuilder searchSourceBuilder = buildSearchSourceBuilder(searchCriteria);
+            SearchSourceBuilder searchSourceBuilder = buildSearchSourceBuilder(searchCriteria, JsonFilePath);
             SearchRequest searchRequest = new SearchRequest(esIndexName);
             searchRequest.source(searchSourceBuilder);
             if (searchSourceBuilder != null) {
@@ -198,7 +202,7 @@ public class EsUtilServiceImpl implements EsUtilService {
         return paginatedResult;
     }
 
-    private SearchSourceBuilder buildSearchSourceBuilder(SearchCriteria searchCriteria) {
+    private SearchSourceBuilder buildSearchSourceBuilder(SearchCriteria searchCriteria, String JsonFilePath) {
         log.info("Building search query");
         if (searchCriteria == null || searchCriteria.toString().isEmpty()) {
             log.error("Search criteria body is missing");
@@ -207,12 +211,12 @@ public class EsUtilServiceImpl implements EsUtilService {
         BoolQueryBuilder boolQueryBuilder = buildFilterQuery(searchCriteria.getFilterCriteriaMap());
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(boolQueryBuilder);
-        addSortToSearchSourceBuilder(searchCriteria, searchSourceBuilder);
+        addSortToSearchSourceBuilder(searchCriteria, searchSourceBuilder, JsonFilePath);
         addRequestedFieldsToSearchSourceBuilder(searchCriteria, searchSourceBuilder);
        // addQueryStringToFilter(searchCriteria.getSearchString(), boolQueryBuilder);
         String searchString = searchCriteria.getSearchString();
         if (isNotBlank(searchString)) {
-            QueryBuilder matchPhraseQuery = getMatchPhraseQuery("searchTags.keyword", searchString, true,boolQueryBuilder);
+            QueryBuilder matchPhraseQuery = getMatchPhraseQuery("description", searchString, true,boolQueryBuilder);
             boolQueryBuilder.must(matchPhraseQuery);
         }
         addFacetsToSearchSourceBuilder(searchCriteria.getFacets(), searchSourceBuilder);
@@ -290,12 +294,19 @@ public class EsUtilServiceImpl implements EsUtilService {
     }
 
     private void addSortToSearchSourceBuilder(
-            SearchCriteria searchCriteria, SearchSourceBuilder searchSourceBuilder) {
+            SearchCriteria searchCriteria, SearchSourceBuilder searchSourceBuilder, String JsonFilePath) {
         if (isNotBlank(searchCriteria.getOrderBy()) && isNotBlank(searchCriteria.getOrderDirection())) {
             SortOrder sortOrder =
                     Constants.ASC.equals(searchCriteria.getOrderDirection()) ? SortOrder.ASC : SortOrder.DESC;
-            searchSourceBuilder.sort(
-                    SortBuilders.fieldSort(searchCriteria.getOrderBy() + Constants.KEYWORD).order(sortOrder));
+            Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
+           Map<String, Object> fieldMap =(Map<String, Object>) schemaMap.get(searchCriteria.getOrderBy());
+           if(fieldMap.get(Constants.TYPE).equals(Constants.NUMBER)){
+               searchSourceBuilder.sort(
+                       SortBuilders.fieldSort(searchCriteria.getOrderBy()).order(sortOrder));
+           }else {
+               searchSourceBuilder.sort(
+                       SortBuilders.fieldSort(searchCriteria.getOrderBy() + Constants.KEYWORD).order(sortOrder));
+           }
         }
     }
 
@@ -539,6 +550,22 @@ public class EsUtilServiceImpl implements EsUtilService {
             log.error(e.getMessage());
             throw new CustomException("error bulk uploading", e.getMessage(),
                 HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public static Map<String, Object> readJsonSchema(String jsonFilePath) {
+        if (schemaCache.containsKey(jsonFilePath)) {
+            return schemaCache.get(jsonFilePath);
+        }
+
+        try (InputStream schemaStream = JsonSchemaFactory.getInstance().getClass().getResourceAsStream(jsonFilePath)) {
+            ObjectMapper objectMapper = new ObjectMapper();
+            Map<String, Object> schemaMap = objectMapper.readValue(schemaStream, new TypeReference<Map<String, Object>>() {});
+            schemaCache.put(jsonFilePath, schemaMap);
+            return schemaMap;
+        } catch (Exception e) {
+            log.error("Error reading json schema", e);
+            throw new CustomException("error reading json schema", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

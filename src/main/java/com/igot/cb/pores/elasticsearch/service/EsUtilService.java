@@ -20,7 +20,7 @@ public interface EsUtilService {
 
   void deleteDocumentsByCriteria(String esIndexName, SearchSourceBuilder sourceBuilder);
 
-  SearchResult searchDocuments(String esIndexName, SearchCriteria searchCriteria) throws Exception;
+  SearchResult searchDocuments(String esIndexName, SearchCriteria searchCriteria, String JsonFilePath) throws Exception;
 
   public boolean isIndexPresent(String indexName);
 
