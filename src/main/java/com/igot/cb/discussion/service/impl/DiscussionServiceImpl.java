@@ -836,7 +836,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                     Constants.KEYSPACE_SUNBIRD, Constants.USER_REPORTED_POSTS, reportCheckData, null, null);
 
             if (!existingReports.isEmpty()) {
-                return returnErrorMsg("User has already reported this discussion", HttpStatus.CONFLICT, response, Constants.FAILED);
+                return returnErrorMsg("User has already reported this discussion", HttpStatus.OK, response, Constants.SUCCESS);
             }
 
             // Store user data in Cassandra
@@ -890,6 +890,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+            deleteCacheByCommunity(data.get(Constants.COMMUNITY_ID).asText());
             map.put(Constants.DISCUSSION_ID, reportData.get(Constants.DISCUSSION_ID));
             response.setResult(map);
             return response;
