@@ -392,6 +392,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         }else {
                             communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
                         }
+                        deleteCacheByCommunity((String) map.get(Constants.COMMUNITY_ID));
                         producer.push(communityPostCount, communityObject);
                         return response;
                     } else {
