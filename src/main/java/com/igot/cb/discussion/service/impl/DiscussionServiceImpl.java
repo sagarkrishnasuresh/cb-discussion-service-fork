@@ -397,6 +397,11 @@ public class DiscussionServiceImpl implements DiscussionService {
                             communityObject.put(Constants.TYPE, Constants.POST);
                         }else {
                             communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
+                            redisTemplate.opsForValue().getAndDelete(
+                                generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
+                                    data.get(Constants.PARENT_DISCUSSION_ID).asText(),
+                                    data.get(Constants.COMMUNITY_ID).asText(),
+                                    Constants.ANSWER_POST)));
                         }
                         producer.push(communityPostCount, communityObject);
                         return response;
@@ -714,6 +719,11 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
             deleteCacheByCommunity(answerPostData.get(Constants.COMMUNITY_ID).asText());
+            redisTemplate.opsForValue()
+                .getAndDelete(generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
+                    answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText(),
+                    answerPostData.get(Constants.COMMUNITY_ID).asText(),
+                    Constants.ANSWER_POST)));
             Map<String, String> communityObject = new HashMap<>();
             communityObject.put(Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText());
             communityObject.put(Constants.STATUS, Constants.INCREMENT);
@@ -732,6 +742,34 @@ public class DiscussionServiceImpl implements DiscussionService {
             return response;
         }
         return response;
+    }
+
+    private SearchCriteria createSearchCriteriaWithDefaults(String parentDiscussionId,
+        String communityId,
+        String type) {
+        SearchCriteria criteria = new SearchCriteria();
+
+        // Initialize filterCriteriaMap with default and specified values
+        HashMap<String, Object> filterMap = new HashMap<>();
+        filterMap.put(Constants.COMMUNITY_ID, communityId);
+        filterMap.put(Constants.TYPE, type);
+        filterMap.put(Constants.PARENT_DISCUSSION_ID, parentDiscussionId);
+        criteria.setFilterCriteriaMap(filterMap);
+        // Initialize requestedFields with an empty list
+        criteria.setRequestedFields(Collections.emptyList());
+
+        // Set default pagination values
+        criteria.setPageNumber(0);
+        criteria.setPageSize(10);
+
+        // Set default ordering
+        criteria.setOrderBy(Constants.CREATED_ON);
+        criteria.setOrderDirection(Constants.DESC);
+
+        // Initialize facets with an empty list
+        criteria.setFacets(Collections.emptyList());
+        return criteria;
+
     }
 
     private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId) {
@@ -1030,7 +1068,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(discussionEntity.getDiscussionId()), jsonNode);
-
+            redisTemplate.opsForValue()
+                .getAndDelete(generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
+                    data.get(Constants.PARENT_DISCUSSION_ID).asText(),
+                    data.get(Constants.COMMUNITY_ID).asText(),
+                    Constants.ANSWER_POST)));
             log.info("AnswerPost updated successfully");
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);
