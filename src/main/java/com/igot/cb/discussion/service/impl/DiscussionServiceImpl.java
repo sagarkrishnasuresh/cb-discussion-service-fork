@@ -782,7 +782,6 @@ public class DiscussionServiceImpl implements DiscussionService {
         } else {
             answerPostSet.remove(discussionId);
         }
-        answerPostSet.add(discussionId);
         ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
         ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
         ((ObjectNode) data).put(Constants.ANSWER_POST_COUNT, answerPostSet.size());
