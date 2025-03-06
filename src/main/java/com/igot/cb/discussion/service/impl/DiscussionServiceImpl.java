@@ -186,7 +186,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         ApiResponse response = ProjectUtil.createDefaultResponse("discussion.read");
         if (StringUtils.isEmpty(discussionId)) {
             log.error("discussion not found");
-            createErrorResponse(response, Constants.ID_NOT_FOUND, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
+            createErrorResponse(response, Constants.ID_NOT_FOUND, HttpStatus.BAD_REQUEST, Constants.FAILED);
             return response;
         }
         try {
@@ -1202,12 +1202,17 @@ public class DiscussionServiceImpl implements DiscussionService {
                 Map<String, Object> properties = new HashMap<>();
                 properties.put(Constants.USERID, userId);
                 properties.put(Constants.COMMUNITY_ID, requestData.get(Constants.COMMUNITY_ID));
-                List<Map<String, Object>> bookmarkedDiscussions = cassandraOperation.getRecordsByPropertiesWithoutFiltering(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.DISCUSSION_ID), null);
+                List<Map<String, Object>> bookmarkedDiscussions = cassandraOperation.getRecordsByPropertiesWithoutFiltering(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.DISCUSSION_ID, Constants.STATUS), null);
                 if (bookmarkedDiscussions.isEmpty()) {
-                    return returnErrorMsg(Constants.NO_DISCUSSIONS_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
+                    return returnErrorMsg(Constants.NO_DISCUSSIONS_FOUND, HttpStatus.OK, response, Constants.SUCCESS);
                 }
                 for (Map<String, Object> bookmarkedDiscussion : bookmarkedDiscussions) {
-                    cachedKeys.add((String) bookmarkedDiscussion.get(Constants.DISCUSSION_ID_KEY));
+                    if (Boolean.TRUE.equals(bookmarkedDiscussion.get(Constants.STATUS))) {
+                        cachedKeys.add((String) bookmarkedDiscussion.get(Constants.DISCUSSION_ID_KEY));
+                    }
+                }
+                if (cachedKeys.isEmpty()) {
+                    return returnErrorMsg(Constants.NO_DISCUSSIONS_FOUND, HttpStatus.OK, response, Constants.SUCCESS);
                 }
                 cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + requestData.get(Constants.COMMUNITY_ID) + userId, cachedKeys);
             }
