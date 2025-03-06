@@ -391,6 +391,12 @@ public class DiscussionServiceImpl implements DiscussionService {
                             communityObject.put(Constants.TYPE, Constants.POST);
                         }else {
                             communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
+                            DiscussionEntity discussionEntity = discussionRepository.findById(
+                                data.get(Constants.PARENT_DISCUSSION_ID).asText()).orElse(null);
+                            if (discussionEntity != null) {
+                                updateAnswerPostToDiscussion(discussionEntity, discussionId,
+                                    Constants.DECREMENT);
+                            }
                             redisTemplate.opsForValue().getAndDelete(
                                 generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
                                     data.get(Constants.PARENT_DISCUSSION_ID).asText(),
@@ -707,7 +713,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
 
-            updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id));
+            updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id), Constants.INCREMENT);
             deleteCacheByCommunity(answerPostData.get(Constants.COMMUNITY_ID).asText());
             redisTemplate.opsForValue()
                 .getAndDelete(generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
@@ -762,7 +768,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
     }
 
-    private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId) {
+    private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId, String action) {
         JsonNode data = discussionEntity.getData();
         Set<String> answerPostSet = new HashSet<>();
 
@@ -770,7 +776,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             ArrayNode existingAnswerPosts = (ArrayNode) data.get(Constants.ANSWER_POSTS);
             existingAnswerPosts.forEach(post -> answerPostSet.add(post.asText()));
         }
-
+        if (Constants.INCREMENT.equals(action)) {
+            answerPostSet.add(discussionId);
+        } else {
+            answerPostSet.remove(discussionId);
+        }
         answerPostSet.add(discussionId);
         ArrayNode arrayNode = objectMapper.valueToTree(answerPostSet);
         ((ObjectNode) data).put(Constants.ANSWER_POSTS, arrayNode);
