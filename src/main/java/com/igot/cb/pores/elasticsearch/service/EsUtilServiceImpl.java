@@ -217,7 +217,7 @@ public class EsUtilServiceImpl implements EsUtilService {
        // addQueryStringToFilter(searchCriteria.getSearchString(), boolQueryBuilder);
         String searchString = searchCriteria.getSearchString();
         if (isNotBlank(searchString)) {
-            QueryBuilder matchPhraseQuery = getMatchPhraseQuery("description.keyword", searchString, true,boolQueryBuilder);
+            QueryBuilder matchPhraseQuery = QueryBuilders.matchPhraseQuery("description", searchString);
             boolQueryBuilder.must(matchPhraseQuery);
         }
         addFacetsToSearchSourceBuilder(searchCriteria.getFacets(), searchSourceBuilder);
