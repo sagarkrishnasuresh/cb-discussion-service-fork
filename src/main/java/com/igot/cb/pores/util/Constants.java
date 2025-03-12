@@ -70,7 +70,7 @@ public class Constants {
     public static final String SEARCH_RESULTS = "search_results";
     public static final String DISCUSSION_ID = "discussionId";
     public static final  String DISCUSSION_IS_NOT_ACTIVE = "Discussion is not active";
-    public static final String USER_DISCUSSION_VOTES = "user_discussion_votes";
+    public static final String USER_POST_VOTES = "user_post_votes";
     public static final String DISCUSSION_ID_KEY = "discussionid";
     public static final String EXCEPTION_MSG_DELETE = "Exception occurred while deleting record from ";
     public static final String VOTE_COUNT = "voteCount";
@@ -178,8 +178,8 @@ public class Constants {
     public static final String DISCUSSIONS = "discussions";
     public static final String FILES = "files";
     public static final String DISCUSSION_UPLOAD_FILE_FETCH_FAILED = "Failed to fetch uploaded files";
-    public static final String USER_REPORTED_POSTS= "user_reported_posts";
-    public static final String POST_REPORTED_BY_USER = "post_reportedby_user";
+    public static final String DISCUSSION_POST_REPORT_LOOKUP_BY_USER = "discussion_post_report_lookup_byuser";
+    public static final String DISCUSSION_POST_REPORT_LOOKUP_BY_POST = "discussion_post_report_lookup_bypost";
     public static final String REASON = "reason";
     public static final String REPORTED = "reported";
     public static final String COMMUNITY = "community";
@@ -201,6 +201,8 @@ public class Constants {
     public static final String TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
     public static final String TAGGED_USER = "taggedUser";
     public static final String NUMBER = "number";
+    public static final String INVALID_TYPE = "Invalid type : ";
+    public static final String USER_MUST_VOTE_FIRST = "User must vote the post first";
 
     private Constants() {
     }

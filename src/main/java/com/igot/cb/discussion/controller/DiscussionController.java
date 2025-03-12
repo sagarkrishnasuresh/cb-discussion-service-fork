@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/discussion")
+@RequestMapping("/v1/discussion")
 public class DiscussionController {
 
     @Autowired
@@ -45,10 +45,10 @@ public class DiscussionController {
         return new ResponseEntity<>(response,response.getResponseCode());
     }
 
-    @DeleteMapping("/delete/{discussionId}")
-    public ResponseEntity<ApiResponse> deleteDiscussion(@PathVariable String discussionId,
+    @DeleteMapping("/question/delete/{discussionId}")
+    public ResponseEntity<ApiResponse> deletePost(@PathVariable String discussionId,
                                                            @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-        ApiResponse response = discussionService.deleteDiscussion(discussionId,token);
+        ApiResponse response = discussionService.deleteDiscussion(discussionId,Constants.QUESTION, token);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
@@ -59,17 +59,17 @@ public class DiscussionController {
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @PostMapping("/upVote/{discussionId}")
-    public ResponseEntity<ApiResponse> upVote(@PathVariable String discussionId,
+    @PostMapping("/question/like/{discussionId}")
+    public ResponseEntity<ApiResponse> postLike(@PathVariable String discussionId,
                                               @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-        ApiResponse response = discussionService.upVote(discussionId, token);
+        ApiResponse response = discussionService.upVote(discussionId,Constants.QUESTION, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @PostMapping("/downVote/{discussionId}")
-    public ResponseEntity<ApiResponse> downVote(@PathVariable String discussionId,
+    @PostMapping("/question/dislike/{discussionId}")
+    public ResponseEntity<ApiResponse> postDislike(@PathVariable String discussionId,
                                                 @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-        ApiResponse response = discussionService.downVote(discussionId, token);
+        ApiResponse response = discussionService.downVote(discussionId, Constants.QUESTION, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
@@ -120,6 +120,27 @@ public class DiscussionController {
     @PostMapping("/communityFeed")
     public ResponseEntity<ApiResponse> searchDiscussionByCommunity(@RequestBody Map<String, Object> searchData) {
         ApiResponse response = discussionService.searchDiscussionByCommunity(searchData);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @DeleteMapping("/answerPost/delete/{discussionId}")
+    public ResponseEntity<ApiResponse> deleteAnswerPost(@PathVariable String discussionId,
+                                                        @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.deleteDiscussion(discussionId, Constants.ANSWER_POST, token);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PostMapping("/answerPost/like/{discussionId}")
+    public ResponseEntity<ApiResponse> answerPostLike(@PathVariable String discussionId,
+                                                      @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.upVote(discussionId, Constants.ANSWER_POST, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/answerPost/dislike/{discussionId}")
+    public ResponseEntity<ApiResponse> answerPostDislike(@PathVariable String discussionId,
+                                                         @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.downVote(discussionId, Constants.ANSWER_POST, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 }
