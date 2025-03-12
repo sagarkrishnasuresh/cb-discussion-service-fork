@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.cloud.storage.BaseStorageService;
 import org.sunbird.cloud.storage.factory.StorageConfig;
@@ -432,7 +433,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_VOTE_API);
         try {
             String userId = accessTokenValidator.verifyUserToken(token);
-            if (StringUtils.isEmpty(userId) || userId.equals(Constants.UNAUTHORIZED)) {
+            if (StringUtils.isEmpty(userId) || Constants.UNAUTHORIZED.equals(userId)) {
                 createErrorResponse(response, Constants.INVALID_AUTH_TOKEN, HttpStatus.BAD_REQUEST, Constants.FAILED);
                 return response;
             }
@@ -464,7 +465,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             properties.put(Constants.USERID, userId);
             List<Map<String, Object>> existingResponseList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(Constants.KEYSPACE_SUNBIRD, Constants.USER_POST_VOTES, properties, null, null);
 
-            if (existingResponseList.isEmpty()) {
+            if (CollectionUtils.isEmpty(existingResponseList)) {
                 if (currentVote) {
                     Map<String, Object> propertyMap = new HashMap<>();
                     propertyMap.put(Constants.USER_ID_RQST, userId);
@@ -888,7 +889,9 @@ public class DiscussionServiceImpl implements DiscussionService {
             if (cbServerProperties.isDiscussionReportHidePost()) {
                 List<Map<String, Object>> reportedByUsers = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
                         Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, Collections.singletonMap(Constants.DISCUSSION_ID, discussionId), null, null);
-                status = reportedByUsers.size() >= cbServerProperties.getReportPostUserLimit() ? Constants.SUSPENDED : Constants.REPORTED;
+                status = CollectionUtils.isEmpty(reportedByUsers) || reportedByUsers.size() >= cbServerProperties.getReportPostUserLimit()
+                        ? Constants.SUSPENDED
+                        : Constants.REPORTED;
             } else {
                 status = Constants.REPORTED;
             }
