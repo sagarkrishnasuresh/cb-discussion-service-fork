@@ -203,6 +203,7 @@ public class Constants {
     public static final String NUMBER = "number";
     public static final String INVALID_TYPE = "Invalid type : ";
     public static final String USER_MUST_VOTE_FIRST = "User must vote the post first";
+    public static final String TOPIC_ID = "topicId";
 
     private Constants() {
     }

@@ -1448,6 +1448,9 @@ public class DiscussionServiceImpl implements DiscussionService {
         if (!searchData.containsKey(Constants.PAGE_NUMBER) || !(searchData.get(Constants.PAGE_NUMBER) instanceof Integer)) {
             errList.add(Constants.PAGE_NUMBER);
         }
+        if (!searchData.containsKey(Constants.TOPIC_ID) && StringUtils.isBlank((String) searchData.get(Constants.TOPIC_ID))) {
+            errList.add(Constants.TOPIC_ID);
+        }
         if (!errList.isEmpty()) {
             errorMsg.append("Failed Due To Missing Params - ").append(errList).append(".");
         }
