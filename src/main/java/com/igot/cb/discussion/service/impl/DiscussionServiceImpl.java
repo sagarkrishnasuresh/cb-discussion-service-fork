@@ -412,7 +412,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         return response;
                     } else {
                         log.info("Discussion is already inactive.");
-                        createErrorResponse(response, Constants.DISCUSSION_IS_INACTIVE, HttpStatus.OK, Constants.SUCCESS);
+                        createErrorResponse(response, Constants.DISCUSSION_IS_INACTIVE, HttpStatus.ALREADY_REPORTED, Constants.SUCCESS);
                         return response;
                     }
                 } else {
@@ -486,13 +486,13 @@ public class DiscussionServiceImpl implements DiscussionService {
                     communityObject.put(Constants.DISCUSSION_ID, discussionId);
                     producer.push(communityLikeCount, communityObject);
                 } else {
-                    createErrorResponse(response, Constants.USER_MUST_VOTE_FIRST, HttpStatus.OK, Constants.FAILED);
+                    createErrorResponse(response, Constants.USER_MUST_VOTE_FIRST, HttpStatus.BAD_REQUEST, Constants.FAILED);
                     return response;
                 }
             } else {
                 Map<String, Object> userVoteData = existingResponseList.get(0);
                 if (userVoteData.get(Constants.VOTE_TYPE).equals(currentVote)) {
-                    createErrorResponse(response, String.format(Constants.USER_ALREADY_VOTED, voteType), HttpStatus.OK, Constants.FAILED);
+                    createErrorResponse(response, String.format(Constants.USER_ALREADY_VOTED, voteType), HttpStatus.ALREADY_REPORTED, Constants.FAILED);
                     return response;
                 }
 
@@ -862,7 +862,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                     Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER, reportCheckData, null, null);
 
             if (!existingReports.isEmpty()) {
-                return returnErrorMsg("User has already reported this post", HttpStatus.OK, response, Constants.SUCCESS);
+                return returnErrorMsg("User has already reported this post", HttpStatus.ALREADY_REPORTED, response, Constants.SUCCESS);
             }
 
             // Store user data in Cassandra
@@ -1148,7 +1148,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                     Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, Arrays.asList(Constants.STATUS), null);
 
             if (!existingBookmarks.isEmpty() && (boolean)existingBookmarks.get(0).get(Constants.STATUS)) {
-                return returnErrorMsg(Constants.ALREADY_BOOKMARKED, HttpStatus.OK, response, Constants.FAILED);
+                return returnErrorMsg(Constants.ALREADY_BOOKMARKED, HttpStatus.ALREADY_REPORTED, response, Constants.FAILED);
             }
 
             // Insert the new bookmark
@@ -1450,9 +1450,6 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
         if (!searchData.containsKey(Constants.PAGE_NUMBER) || !(searchData.get(Constants.PAGE_NUMBER) instanceof Integer)) {
             errList.add(Constants.PAGE_NUMBER);
-        }
-        if (!searchData.containsKey(Constants.TOPIC_ID) && StringUtils.isBlank((String) searchData.get(Constants.TOPIC_ID))) {
-            errList.add(Constants.TOPIC_ID);
         }
         if (!errList.isEmpty()) {
             errorMsg.append("Failed Due To Missing Params - ").append(errList).append(".");
