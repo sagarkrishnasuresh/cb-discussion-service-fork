@@ -18,13 +18,13 @@ public interface DiscussionService {
 
     ApiResponse searchDiscussion(SearchCriteria searchCriteria);
 
-    ApiResponse deleteDiscussion(String discussionId,String token);
+    ApiResponse deleteDiscussion(String discussionId, String type, String token);
 
     ApiResponse createAnswerPost(JsonNode answerPostData, String token);
 
-    ApiResponse upVote(String discussionId, String token);
+    ApiResponse upVote(String discussionId, String type, String token);
 
-    ApiResponse downVote(String discussionId, String token);
+    ApiResponse downVote(String discussionId, String type, String token);
 
     ApiResponse report(String token, Map<String, Object> reportData);
 
