@@ -160,7 +160,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.setResult(map);
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, saveJsonEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + saveJsonEntity.getDiscussionId(), jsonNode);
-            deleteCacheByCommunity(discussionDetails.get(Constants.COMMUNITY_ID).asText());
+            deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + discussionDetails.get(Constants.COMMUNITY_ID).asText());
+            deleteCacheByCommunity(Constants.DISCUSSION_POSTS_BY_USER + discussionDetails.get(Constants.COMMUNITY_ID).asText() + Constants.UNDER_SCORE + userId);
             Map<String, String> communityObject = new HashMap<>();
             communityObject.put(Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText());
             communityObject.put(Constants.STATUS, Constants.INCREMENT);
@@ -240,6 +241,12 @@ public class DiscussionServiceImpl implements DiscussionService {
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("update.Discussion");
         payloadValidation.validatePayload(Constants.DISCUSSION_UPDATE_VALIDATION_SCHEMA, updateData);
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
+            response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return response;
+        }
         try {
             updateMetricsApiCall(Constants.DISCUSSION_UPDATE);
             String discussionId = updateData.get(Constants.DISCUSSION_ID).asText();
@@ -279,12 +286,13 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), jsonNode);
+            deleteCacheByCommunity(Constants.DISCUSSION_POSTS_BY_USER + data.get(Constants.COMMUNITY_ID).asText() + Constants.UNDER_SCORE + userId);
 
             Map<String, Object> responseMap = objectMapper.convertValue(discussionDbData, new TypeReference<Map<String, Object>>() {});
             response.setResponseCode(HttpStatus.OK);
             response.setResult(responseMap);
             response.getParams().setStatus(Constants.SUCCESS);
-            deleteCacheByCommunity(communityId);
+            deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + communityId);
             //updateCacheForFirstFivePages(communityId);
         } catch (Exception e) {
             log.error("Failed to update the discussion: ", e);
@@ -300,7 +308,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         log.info("DiscussionServiceImpl::searchDiscussion");
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
-        String cacheKey = generateRedisJwtTokenKey(searchCriteria);
+        String cacheKey = generateRedisTokenKey(searchCriteria);
         SearchResult searchResult = redisTemplate.opsForValue().get(cacheKey);
         if (searchResult != null) {
             log.info("DiscussionServiceImpl::searchDiscussion:  search result fetched from redis");
@@ -320,6 +328,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             searchCriteria.getFilterCriteriaMap().put(Constants.IS_ACTIVE, true);
             searchCriteria.getFilterCriteriaMap().put(Constants.STATUS, Arrays.asList(Constants.ACTIVE,Constants.REPORTED));
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
+            if (CollectionUtils.isEmpty(searchResult.getData())) {
+                createErrorResponse(response, Constants.NO_DATA_FOUND, HttpStatus.OK, Constants.SUCCESS);
+                response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
+                return response;
+            }
             List<Map<String, Object>> discussions = searchResult.getData();
 
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
@@ -407,7 +420,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                                     data.get(Constants.COMMUNITY_ID).asText(),
                                     Constants.ANSWER_POST)));
                         }
-                        deleteCacheByCommunity((String) map.get(Constants.COMMUNITY_ID));
+                        deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + map.get(Constants.COMMUNITY_ID));
                         producer.push(communityPostCount, communityObject);
                         return response;
                     } else {
@@ -600,6 +613,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     }
 
     public List<Object> fetchUserFromPrimary(List<String> userIds) {
+        log.info("DiscussionServiceImpl::fetchUserFromPrimary: Fetching user data from Cassandra");
         List<Object> userList = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
         propertyMap.put(Constants.ID, userIds);
@@ -724,7 +738,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
 
             updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id), Constants.INCREMENT);
-            deleteCacheByCommunity(answerPostData.get(Constants.COMMUNITY_ID).asText());
+            deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + answerPostData.get(Constants.COMMUNITY_ID).asText());
             redisTemplate.opsForValue()
                 .getAndDelete(generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
                     answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText(),
@@ -918,7 +932,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
-            deleteCacheByCommunity(data.get(Constants.COMMUNITY_ID).asText());
+            deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + data.get(Constants.COMMUNITY_ID).asText());
             map.put(Constants.DISCUSSION_ID, reportData.get(Constants.DISCUSSION_ID));
             response.setResult(map);
             return response;
@@ -983,7 +997,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
         File file = null;
         try {
-            file = new File(System.currentTimeMillis() + "_" + mFile.getOriginalFilename());
+            file = new File(System.currentTimeMillis() + Constants.UNDER_SCORE + mFile.getOriginalFilename());
 
             file.createNewFile();
             // Use try-with-resources to ensure FileOutputStream is closed
@@ -1376,7 +1390,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
 
         try {
-            String cacheKey = Constants.DISCUSSION_CACHE_PREFIX + searchData.get(Constants.COMMUNITY_ID) + "_" + searchData.get(Constants.PAGE_NUMBER);
+            String cacheKey = Constants.DISCUSSION_CACHE_PREFIX + searchData.get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchData.get(Constants.PAGE_NUMBER);
             SearchResult searchResult = redisTemplate.opsForValue().get(cacheKey);
 
             if (searchResult != null) {
@@ -1457,8 +1471,8 @@ public class DiscussionServiceImpl implements DiscussionService {
         return errorMsg.toString();
     }
 
-    private void deleteCacheByCommunity(String communityId) {
-        String pattern = Constants.DISCUSSION_CACHE_PREFIX + communityId + "_*";
+    private void deleteCacheByCommunity(String prefix) {
+        String pattern = prefix + "_*";
         Set<String> keys = redisTemplate.keys(pattern);
         if (!keys.isEmpty()) {
             redisTemplate.delete(keys);
@@ -1482,7 +1496,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             if (searchCriteria.getRequestedFields().contains(Constants.CREATED_BY) || searchCriteria.getRequestedFields().isEmpty()) {
                 fetchAndEnhanceDiscussions(discussions,false);
             }
-            String cacheKeyPrefix = Constants.DISCUSSION_CACHE_PREFIX + communityId + "_";
+            String cacheKeyPrefix = Constants.DISCUSSION_CACHE_PREFIX + communityId + Constants.UNDER_SCORE;
 
             for (int pageNumber = 1; pageNumber <= 5; pageNumber++) {
                 int fromIndex = (pageNumber - 1) * cbServerProperties.getDiscussionEsDefaultPageSize();
@@ -1508,5 +1522,30 @@ public class DiscussionServiceImpl implements DiscussionService {
         ZonedDateTime zonedDateTime = currentTime.toInstant().atZone(ZoneId.systemDefault());
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.TIME_FORMAT);
         return zonedDateTime.format(formatter);
+    }
+
+    private String generateRedisTokenKey(SearchCriteria searchCriteria) {
+        if (searchCriteria != null) {
+            if (searchCriteria.getFilterCriteriaMap().containsKey(Constants.CREATED_BY)
+                    && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
+                    && searchCriteria.getFilterCriteriaMap().containsKey(Constants.TYPE)
+                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY))
+                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID))
+                    && Constants.QUESTION.equals(searchCriteria.getFilterCriteriaMap().get(Constants.TYPE))) {
+                return Constants.DISCUSSION_POSTS_BY_USER
+                        + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
+                        + Constants.UNDER_SCORE
+                        + searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY)
+                        + Constants.UNDER_SCORE
+                        + searchCriteria.getPageNumber();
+            }
+            try {
+                String reqJsonString = objectMapper.writeValueAsString(searchCriteria);
+                return JWT.create().withClaim(Constants.REQUEST_PAYLOAD, reqJsonString).sign(Algorithm.HMAC256(Constants.JWT_SECRET_KEY));
+            } catch (JsonProcessingException e) {
+                log.error("Error occurred while converting json object to json string", e);
+            }
+        }
+        return "";
     }
 }

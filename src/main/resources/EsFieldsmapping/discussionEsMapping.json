@@ -9,7 +9,7 @@
     "type": "keyword"
   },
   "description": {
-    "type": "keyword"
+    "type": "text"
   },
   "createdBy": {
   "type": "keyword"

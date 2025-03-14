@@ -39,10 +39,6 @@ public class Constants {
     public static final String SSO_REALM = "sso.realm";
     public static final String ACCESS_TOKEN_PUBLICKEY_BASEPATH = "accesstoken.publickey.basepath";
     public static final String ID = "id";
-    public static final String FETCH_RESULT_CONSTANT = ".fetchResult:";
-    public static final String URI_CONSTANT = "URI: ";
-    public static final String REQUEST_CONSTANT = "Request: ";
-    public static final String RESPONSE_CONSTANT = "Response: ";
     public static final String SEARCH_OPERATION_LESS_THAN = "<";
     public static final String SEARCH_OPERATION_GREATER_THAN = ">";
     public static final String SEARCH_OPERATION_LESS_THAN_EQUALS = "<=";
@@ -72,11 +68,8 @@ public class Constants {
     public static final  String DISCUSSION_IS_NOT_ACTIVE = "Discussion is not active";
     public static final String USER_POST_VOTES = "user_post_votes";
     public static final String DISCUSSION_ID_KEY = "discussionid";
-    public static final String EXCEPTION_MSG_DELETE = "Exception occurred while deleting record from ";
     public static final String VOTE_COUNT = "voteCount";
     public static final String VOTE_TYPE = "votetype";
-    public static final String TAGS = "tags";
-    public static final String TARGET_TOPIC = "targetTopic";
     public static final String UP = "up";
     public static final String DOWN = "down";
     public static final String DISCUSSION_CACHE_PREFIX = "discussion_";
@@ -95,7 +88,6 @@ public class Constants {
     public static final String ID_NOT_FOUND = "Id not found";
     public static final String INVALID_ID = "Invalid Id";
     public static final String TYPE = "type";
-    public static final String DESCRIPTION_PAYLOAD = "description";
     public static final String IS_ACTIVE = "isActive";
     public static final String DELETED_SUCCESSFULLY = "deleted successfully";
     public static final String NO_DATA_FOUND = "No data found";
@@ -105,7 +97,6 @@ public class Constants {
     public static final String FAILED_CONST = "FAILED";
     public static final String X_AUTH_TOKEN = "x-authenticated-user-token";
     public static final String UPDATED_ON = "updatedOn";
-    public static final String MEDIA = "mediaUrls";
     public static final String USER_PREFIX = "user:" ;
     public static final String USER_TABLE = "user";
     public static final String PROFILE_DETAILS = "profiledetails";
@@ -125,7 +116,6 @@ public class Constants {
     public static final String ANSWER_POST_COUNT = "answerPostCount";
     public static final String DISCUSSION_NOT_FOUND = "DiscussionId not found Please provide a valid discussion id";
     public static final String UP_VOTE_COUNT = "upVoteCount";
-    public static final String DOWN_VOTE_COUNT = "downVoteCount";
     public static final String DISCUSSION_VOTE_API = "discussion.vote";
     public static final String STATUS = "status";
     public static final String REPORTED_BY = "reportedBy";
@@ -140,11 +130,9 @@ public class Constants {
     public static final String URL = "url";
     public static final String UPLOAD_FILE = "api.file.upload";
     public static final String DISCUSSION_FILE_EMPTY = "File is empty";
-    public static final String ADDITIONAL_REPORT_REASONS = "additionalReportReasons";
     public static final String OTHERS = "Others";
     public static final String PARENT_ANSWER_POST_ID_ERROR = "parentAnswerPostId cannot be of type answerPost";
     public static final String PARENT_DISCUSSION_ID_ERROR = "parentDiscussion is suspended, Please provide a valid parentDiscussion id";
-    public static final String ELASTICSEARCH = "elasticsearch";
     public static final String DISCUSSION_ANSWER_POST = "discussion/answerPosts";
     public static final String REDIS = "redis";
     public static final String DISCUSSION_CREATE = "discussion/create";
@@ -156,7 +144,6 @@ public class Constants {
     public static final String CASSANDRA = "cassandra";
     public static final String DISCUSSION_READ = "discussion/read";
     public static final String UPDATE_KEY = "update";
-    public static final String SEARCHTAGS = "searchTags";
     public static final String INVALID_COMMUNITY_ID = "Invalid communityId";
     public static final String COMMUNITY_ID = "communityId";
     public static final String COMMUNITY_ID_CANNOT_BE_UPDATED = "communityId cannot be updated";
@@ -175,9 +162,6 @@ public class Constants {
     public static final String DISCUSSION_UN_BOOKMARK_FAILED = "Failed to unBookmark the post";
     public static final String NO_DISCUSSIONS_FOUND = "No discussions found";
     public static final String DISCUSSION_BOOKMARK_FETCH_FAILED = "Failed to fetch bookmarked discussions";
-    public static final String DISCUSSIONS = "discussions";
-    public static final String FILES = "files";
-    public static final String DISCUSSION_UPLOAD_FILE_FETCH_FAILED = "Failed to fetch uploaded files";
     public static final String DISCUSSION_POST_REPORT_LOOKUP_BY_USER = "discussion_post_report_lookup_byuser";
     public static final String DISCUSSION_POST_REPORT_LOOKUP_BY_POST = "discussion_post_report_lookup_bypost";
     public static final String REASON = "reason";
@@ -185,13 +169,9 @@ public class Constants {
     public static final String COMMUNITY = "community";
     public static final String PAGE = "page";
     public static final String PAGE_SIZE = "pageSize";
-    public static final String DATA = "data";
-    public static final String TOTAL_COUNT = "totalCount";
     public static final String PAGE_NUMBER = "pageNumber";
     public static final String DESC = "DESC";
     public static final String SEARCH_STRING = "searchString";
-    public static final String UNEXPECTED_PARAMETER = "Unexpected parameter: ";
-    public static final String MISSING_PARAMETER = "Missing parameter: ";
     public static final String MISSING_REQUEST_DATA= "Failed Due To Missing Params - requestData is null.";
     public static final String QUESTION = "question";
     public static final String DISCUSSION_VALIDATION_SCHEMA = "discussionValidation";
@@ -203,7 +183,8 @@ public class Constants {
     public static final String NUMBER = "number";
     public static final String INVALID_TYPE = "Invalid type : ";
     public static final String USER_MUST_VOTE_FIRST = "User must vote the post first";
-    public static final String TOPIC_ID = "topicId";
+    public static final String DISCUSSION_POSTS_BY_USER = "discussionPostsByUser_";
+    public static final String UNDER_SCORE = "_";
 
     private Constants() {
     }
