@@ -2,6 +2,8 @@ package com.igot.cb.pores.cache;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.igot.cb.pores.util.Constants;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +22,9 @@ public class CacheService {
 
   @Value("${spring.redis.cacheTtl}")
   private long cacheTtl;
+
+  @Autowired
+  private JedisPool jedisDataPopulationPool;
 
   public Jedis getJedis() {
     try (Jedis jedis = jedisPool.getResource()) {
@@ -61,4 +66,17 @@ public class CacheService {
       return null;
     }
   }
+  public List<Object> hget(List<String> keys) {
+    List<Object> resultList = new ArrayList<>();
+    try (Jedis jedis = jedisDataPopulationPool.getResource()) {
+      for (String key : keys) {
+        String values = jedis.get(key); // Fetch entire hash
+        resultList.add(values); // Add map as an Object
+      }
+    } catch (Exception e) {
+      log.error("Error while fetching data from Redis: {}", e.getMessage(), e);
+    }
+    return resultList;
+  }
+
 }

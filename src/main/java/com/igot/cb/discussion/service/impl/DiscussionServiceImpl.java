@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
 import com.igot.cb.authentication.util.AccessTokenValidator;
 import com.igot.cb.discussion.entity.CommunityEntity;
 import com.igot.cb.discussion.entity.DiscussionEntity;
@@ -38,7 +37,6 @@ import org.sunbird.cloud.storage.BaseStorageService;
 import org.sunbird.cloud.storage.factory.StorageConfig;
 import org.sunbird.cloud.storage.factory.StorageServiceFactory;
 import scala.Option;
-import java.time.LocalDate;
 
 import javax.annotation.PostConstruct;
 import java.io.File;
@@ -640,19 +638,18 @@ public class DiscussionServiceImpl implements DiscussionService {
 
         // Create a map of key-value pairs, converting stringified JSON objects to User objects
         return keys.stream()
-                .filter(key -> values.get(keys.indexOf(key)) != null) // Filter out null values
-                .map(key -> {
-                    String stringifiedJson = (String) values.get(keys.indexOf(key)); // Cast the value to String
-                    try {
-                        // Convert the stringified JSON to a User object using ObjectMapper
-                        return objectMapper.readValue(stringifiedJson, Object.class); // You can map this to a specific User type if needed
-                    } catch (Exception e) {
-                        // Handle any exceptions during deserialization
-                        e.printStackTrace();
-                        return null; // Return null in case of error
-                    }
-                })
-                .collect(Collectors.toList());
+            .filter(key -> values.get(keys.indexOf(key)) != null) // Filter out null values
+            .map(key -> {
+                String stringifiedJson = (String) values.get(keys.indexOf(key)); // Cast the value to String
+                try {
+                    // Convert the stringified JSON to a User object using ObjectMapper
+                    return objectMapper.readValue(stringifiedJson, Object.class); // You can map this to a specific User type if needed
+                } catch (Exception e) {
+                    log.error("Failed to fetch user data from redis ", e.getMessage(), e);
+                    return null; // Return null in case of error
+                }
+            })
+            .collect(Collectors.toList());
     }
 
     public List<Object> fetchUserFromPrimary(List<String> userIds) {
