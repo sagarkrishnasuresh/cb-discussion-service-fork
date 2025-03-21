@@ -187,6 +187,7 @@ public class Constants {
     public static final String UNDER_SCORE = "_";
     public static final String CATEGORY_TYPE = "categoryType";
     public static final Object DOCUMENT_CATEGORY = "document";
+    public static final String DISCUSSION_TEXT = "discussionText";
 
     private Constants() {
     }
