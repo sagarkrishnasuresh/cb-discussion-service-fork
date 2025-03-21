@@ -892,6 +892,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
         try {
             String discussionId = (String) reportData.get(Constants.DISCUSSION_ID);
+            String discussionText = (String) reportData.get(Constants.DISCUSSION_TEXT);
             Optional<DiscussionEntity> discussionDbData = discussionRepository.findById(discussionId);
             if (!discussionDbData.isPresent()) {
                 return returnErrorMsg(Constants.DISCUSSION_NOT_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
@@ -927,6 +928,9 @@ public class DiscussionServiceImpl implements DiscussionService {
             Map<String, Object> userReportData = new HashMap<>();
             userReportData.put(Constants.USERID, userId);
             userReportData.put(Constants.DISCUSSION_ID, discussionId);
+            if (StringUtils.isNotBlank(discussionText)) {
+                userReportData.put(Constants.DISCUSSION_TEXT, discussionText);
+            }
             if (reportData.containsKey(Constants.REPORTED_REASON)) {
                 List<String> reportedReasonList = (List<String>) reportData.get(Constants.REPORTED_REASON);
                 if (reportedReasonList != null && !reportedReasonList.isEmpty()) {
