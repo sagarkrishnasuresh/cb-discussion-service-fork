@@ -185,7 +185,11 @@ public class Constants {
     public static final String USER_MUST_VOTE_FIRST = "User must vote the post first";
     public static final String DISCUSSION_POSTS_BY_USER = "discussionPostsByUser_";
     public static final String UNDER_SCORE = "_";
+    public static final String DISCUSSION_DOCUMENT_POST = "discussionDocumentPost_";
     public static final String CATEGORY_TYPE = "categoryType";
+    public static final String DOCUMENT = "document";
+    public static final String COMMUNITY_ID_KEY = "communityid";
+    public static final String DISCUSSION_GET_GLOBAL_FEED_API = "discussion.getGlobalFeed";
     public static final Object DOCUMENT_CATEGORY = "document";
     public static final String DISCUSSION_TEXT = "discussionText";
 
