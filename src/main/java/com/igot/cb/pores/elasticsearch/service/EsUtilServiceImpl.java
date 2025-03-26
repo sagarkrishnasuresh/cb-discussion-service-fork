@@ -242,6 +242,10 @@ public class EsUtilServiceImpl implements EsUtilService {
                             boolQueryBuilder.must(
                                     QueryBuilders.termsQuery(
                                             field + Constants.KEYWORD, ((ArrayList<?>) value).toArray()));
+                        } else if (value instanceof Set) {
+                                boolQueryBuilder.must(
+                                        QueryBuilders.termsQuery(
+                                                field + Constants.KEYWORD, ((Set<?>) value).toArray()));
                         } else if (value instanceof String) {
                             boolQueryBuilder.must(QueryBuilders.termsQuery(field + Constants.KEYWORD, value));
                         } else if (value instanceof Map) {
@@ -298,7 +302,7 @@ public class EsUtilServiceImpl implements EsUtilService {
             SearchCriteria searchCriteria, SearchSourceBuilder searchSourceBuilder, String JsonFilePath) {
         if (isNotBlank(searchCriteria.getOrderBy()) && isNotBlank(searchCriteria.getOrderDirection())) {
             SortOrder sortOrder =
-                    Constants.ASC.equals(searchCriteria.getOrderDirection()) ? SortOrder.ASC : SortOrder.DESC;
+                    Constants.ASC.equalsIgnoreCase(searchCriteria.getOrderDirection()) ? SortOrder.ASC : SortOrder.DESC;
             Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
             Map<String, Object> fieldMap = (Map<String, Object>) schemaMap.get(searchCriteria.getOrderBy());
             if (MapUtils.isNotEmpty(fieldMap) && fieldMap.get(Constants.TYPE).equals(Constants.NUMBER)) {
