@@ -24,6 +24,7 @@ import com.igot.cb.pores.util.*;
 import com.igot.cb.producer.Producer;
 import com.igot.cb.transactional.cassandrautils.CassandraOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.cloud.storage.BaseStorageService;
 import org.sunbird.cloud.storage.factory.StorageConfig;
@@ -1627,6 +1627,171 @@ public class DiscussionServiceImpl implements DiscussionService {
     }
 
     @Override
+    public ApiResponse getEnrichedDiscussionData(Map<String, Object> data, String token) {
+        ApiResponse response = ProjectUtil.createDefaultResponse("discussion.getEnrichedDiscussionData");
+        Map<String, Object> requestData = (Map<String, Object>) data.get("request");
+
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
+            response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return response;
+        }
+
+        String errMsg = validateEnrichDataRequest(requestData);
+        if (StringUtils.isNotBlank(errMsg)) {
+            return returnErrorMsg(errMsg, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+
+        List<Map<String, Object>> communityFilters = (List<Map<String, Object>>) requestData.get(Constants.COMMUNITY_FILTERS);
+        List<String> filters = (List<String>) requestData.get(Constants.FILTERS);
+
+
+        List<String> allDiscussionIds = new ArrayList<>();
+        for (Map<String, Object> communityFilter : communityFilters) {
+            List<String> discussionIdsForCommunity = (List<String>) communityFilter.get("identifier");
+            allDiscussionIds.addAll(discussionIdsForCommunity);
+        }
+
+
+        Map<String, Boolean> likesMap = initializeDefaultMap(allDiscussionIds, false);
+        Map<String, Boolean> bookmarksMap = initializeDefaultMap(allDiscussionIds, false);
+        Map<String, Boolean> reportedMap = initializeDefaultMap(allDiscussionIds, false);
+
+        try {
+            for (Map<String, Object> communityFilter : communityFilters) {
+                String communityId = (String) communityFilter.get(Constants.COMMUNITY_ID);
+                List<String> discussionIds = (List<String>) communityFilter.get(Constants.IDENTIFIER);
+
+                if (filters.contains(Constants.LIKES)) {
+                    fetchLikes(discussionIds, userId, likesMap);
+                }
+                if (filters.contains(Constants.BOOKMARKS)) {
+                    fetchBookmarks(discussionIds, userId, communityId, bookmarksMap);
+                }
+                if (filters.contains(Constants.REPORTED)) {
+                    fetchReported(discussionIds, userId, reportedMap);
+                }
+            }
+
+            Map<String, Object> searchResults = new HashMap<>();
+            searchResults.put(Constants.LIKES, likesMap);
+            searchResults.put(Constants.BOOKMARKS, bookmarksMap);
+            searchResults.put(Constants.REPORTED, reportedMap);
+
+            response.setResult(Collections.singletonMap(Constants.SEARCH_RESULTS, searchResults));
+
+        } catch (Exception e) {
+            log.error("DiscussionService::getEnrichedDiscussionData: Failed to fetch discussions", e);
+            return returnErrorMsg("getEnrichedDiscussionData", HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+        }
+
+        return response;
+    }
+
+    private Map<String, Boolean> initializeDefaultMap(List<String> discussionIds, boolean defaultValue) {
+        Map<String, Boolean> defaultMap = new HashMap<>();
+        for (String discussionId : discussionIds) {
+            defaultMap.put(discussionId, defaultValue);
+        }
+        return defaultMap;
+    }
+
+    private void fetchLikes(List<String> discussionIds, String userId, Map<String, Boolean> likesMap) {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(Constants.DISCUSSION_ID_KEY, discussionIds);
+        properties.put(Constants.USERID, userId);
+
+        List<Map<String, Object>> likesList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                Constants.KEYSPACE_SUNBIRD, Constants.USER_POST_VOTES, properties, null, null);
+
+        likesList.stream()
+                .filter(record -> Boolean.TRUE.equals(record.get(Constants.VOTE_TYPE)))
+                .map(record -> (String) record.get(Constants.DISCUSSION_ID_KEY))
+                .forEach(discussionId -> likesMap.put(discussionId, true));
+    }
+
+    private void fetchBookmarks(List<String> discussionIds, String userId, String communityId, Map<String, Boolean> bookmarksMap) {
+
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(Constants.DISCUSSION_ID_KEY, discussionIds);
+        properties.put(Constants.USERID, userId);
+        properties.put(Constants.COMMUNITY_ID, communityId);
+
+        List<Map<String, Object>> bookmarksList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties, null, null);
+
+        bookmarksList.stream()
+                .filter(record -> Boolean.TRUE.equals(record.get(Constants.STATUS)))
+                .map(record -> (String) record.get(Constants.DISCUSSION_ID_KEY))
+                .forEach(discussionId -> bookmarksMap.put(discussionId, true));
+    }
+
+    private void fetchReported(List<String> discussionIds, String userId, Map<String, Boolean> reportedMap) {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(Constants.DISCUSSION_ID_KEY, discussionIds);
+        properties.put(Constants.USERID, userId);
+
+        List<Map<String, Object>> reportedList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER, properties, null, null);
+
+        reportedList.stream()
+                .map(record -> (String) record.get(Constants.DISCUSSION_ID_KEY))
+                .forEach(discussionId -> reportedMap.put(discussionId, true));
+    }
+
+
+
+    private String validateEnrichDataRequest(Map<String, Object> requestData) {
+        if (requestData == null) {
+            return Constants.MISSING_REQUEST_DATA;
+        }
+
+        List<String> errList = new ArrayList<>();
+
+        Object communityFiltersObj = requestData.get(Constants.COMMUNITY_FILTERS);
+        if (!(communityFiltersObj instanceof List<?>)) {
+            errList.add("Missing or invalid communityFilters.");
+        } else {
+            List<?> communityFilters = (List<?>) communityFiltersObj;
+            if (communityFilters.isEmpty()) {
+                errList.add("Empty communityFilters.");
+            } else {
+                for (Object obj : communityFilters) {
+                    if (!(obj instanceof Map<?, ?>)) {
+                        errList.add("Invalid communityFilters structure.");
+                        continue;
+                    }
+
+                    Map<?, ?> communityFilter = (Map<?, ?>) obj;
+
+                    String communityId = (String) communityFilter.get(Constants.COMMUNITY_ID);
+                    List<?> identifiers = (List<?>) communityFilter.get(Constants.IDENTIFIER);
+
+                    if (StringUtils.isBlank(communityId) || identifiers == null || identifiers.isEmpty()) {
+                        errList.add("Invalid communityFilter: communityId or identifiers are missing/empty.");
+                    }
+                }
+            }
+        }
+
+        List<String> validFilters = Arrays.asList(Constants.LIKES, Constants.BOOKMARKS, Constants.REPORTED);
+        if (!requestData.containsKey(Constants.FILTERS) ||
+                !(requestData.get(Constants.FILTERS) instanceof List)) {
+            errList.add(Constants.FILTERS);
+        } else {
+            List<?> filtersList = (List<?>) requestData.get(Constants.FILTERS);
+            if (filtersList.isEmpty() || filtersList.stream().noneMatch(validFilters::contains)) {
+                errList.add(Constants.FILTERS);
+            }
+        }
+
+        return errList.isEmpty() ? "" : "Failed Due To Missing or Invalid Params - " + errList + ".";
+    }
+
+
+
+
     public ApiResponse getGlobalFeed(SearchCriteria searchCriteria, String token, boolean isOverride) {
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_GET_GLOBAL_FEED_API);
         String userId = accessTokenValidator.verifyUserToken(token);

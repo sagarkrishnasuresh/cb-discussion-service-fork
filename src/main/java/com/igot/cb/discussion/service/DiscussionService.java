@@ -40,5 +40,7 @@ public interface DiscussionService {
 
     ApiResponse searchDiscussionByCommunity(Map<String, Object> searchData);
 
+    ApiResponse getEnrichedDiscussionData(Map<String, Object> data, String token);
+
     ApiResponse getGlobalFeed(SearchCriteria searchCriteria, String token, boolean isOverride);
 }
