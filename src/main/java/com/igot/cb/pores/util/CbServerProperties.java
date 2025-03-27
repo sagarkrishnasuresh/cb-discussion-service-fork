@@ -48,4 +48,7 @@ public class CbServerProperties {
 
   @Value("${discussion.report.hide.post}")
   private boolean discussionReportHidePost;
+
+  @Value("${filter.criteria.trending.feed}")
+  private String filterCriteriaTrendingFeed;
 }

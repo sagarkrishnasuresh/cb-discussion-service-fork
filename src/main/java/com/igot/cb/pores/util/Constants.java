@@ -192,6 +192,8 @@ public class Constants {
     public static final String DISCUSSION_GET_GLOBAL_FEED_API = "discussion.getGlobalFeed";
     public static final Object DOCUMENT_CATEGORY = "document";
     public static final String DISCUSSION_TEXT = "discussionText";
+    public static final String COMMUNITY_NAME = "communityName";
+    public static final String COMMUNITY_PREFIX = "community_";
 
     private Constants() {
     }
