@@ -8,6 +8,7 @@ import lombok.Setter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Getter
 @Setter
@@ -32,4 +33,24 @@ public class SearchCriteria {
     private List<String> facets;
 
     private Map<String, Object> query;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SearchCriteria that = (SearchCriteria) o;
+        return pageNumber == that.pageNumber &&
+                pageSize == that.pageSize &&
+                Objects.equals(searchString, that.searchString) &&
+                Objects.equals(filterCriteriaMap, that.filterCriteriaMap) &&
+                Objects.equals(requestedFields, that.requestedFields) &&
+                Objects.equals(orderBy, that.orderBy) &&
+                Objects.equals(orderDirection, that.orderDirection) &&
+                Objects.equals(facets, that.facets);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(searchString, filterCriteriaMap, requestedFields, pageNumber, pageSize, orderBy, orderDirection, facets);
+    }
 }

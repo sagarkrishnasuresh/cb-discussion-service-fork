@@ -337,6 +337,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         log.info("DiscussionServiceImpl::searchDiscussion");
         ApiMetricsTracker.enableTracking();
         ApiResponse response = ProjectUtil.createDefaultResponse("search.discussion");
+        boolean isTrending = isTrendingPost(searchCriteria);
         String cacheKey = generateRedisTokenKey(searchCriteria);
         SearchResult searchResult = null;
         if (!isOverride) {
@@ -376,7 +377,9 @@ public class DiscussionServiceImpl implements DiscussionService {
                 }
                 fetchAndEnhanceDiscussions(discussions, isAnswerPost);
             }
-
+            if(isTrending){
+                enhanceCommunityData(discussions);
+            }
             searchResult.setData(discussions);
             redisTemplate.opsForValue().set(cacheKey, searchResult, cbServerProperties.getSearchResultRedisTtl(), TimeUnit.SECONDS);
             response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
@@ -626,9 +629,14 @@ public class DiscussionServiceImpl implements DiscussionService {
         return str.toString();
     }
 
-    public List<Object> fetchDataForKeys(List<String> keys) {
+    public List<Object> fetchDataForKeys(List<String> keys, boolean isUserData) {
         // Fetch values for all keys from Redis
-        List<Object> values = redisTemp.opsForValue().multiGet(keys);
+        List<Object> values;
+        if (isUserData) {
+            values = cacheService.hget(keys);
+        } else {
+            values = redisTemp.opsForValue().multiGet(keys);
+        }
 
         // Create a map of key-value pairs, converting stringified JSON objects to User objects
         return keys.stream()
@@ -1378,7 +1386,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
         long userDataRedisTime = System.currentTimeMillis();
         List<Object> redisResults = fetchDataForKeys(
-                allUserIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList())
+                allUserIds.stream().map(id -> Constants.USER_PREFIX + id).collect(Collectors.toList()), true
         );
         updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.REDIS, Constants.READ, userDataRedisTime);
         Map<String, Object> userDetailsMap = redisResults.stream()
@@ -1649,6 +1657,77 @@ public class DiscussionServiceImpl implements DiscussionService {
 
     }
 
+    private boolean isTrendingPost(SearchCriteria searchCriteria) {
+        try {
+            SearchCriteria trendingCriteria = objectMapper.readValue(cbServerProperties.getFilterCriteriaTrendingFeed(), SearchCriteria.class);
+            trendingCriteria.setPageNumber(searchCriteria.getPageNumber());
+            return searchCriteria.equals(trendingCriteria);
+        } catch (Exception e) {
+            log.error("Error occurred while checking if the post is trending", e);
+            return false;
+        }
+    }
 
+    private void enhanceCommunityData(List<Map<String, Object>> discussions) {
+        Set<String> communityIds = discussions.stream()
+                .map(discussion -> (String) discussion.get(Constants.COMMUNITY_ID))
+                .collect(Collectors.toSet());
 
+        // Fetch community data from Redis
+        List<Object> redisResults = fetchDataForKeys(
+                communityIds.stream().map(id -> Constants.COMMUNITY_PREFIX + id).collect(Collectors.toList()),false
+        );
+
+        Map<String, String> communityDetailsMap = redisResults.stream()
+                .map(community -> (Map<String, Object>) community)
+                .collect(Collectors.toMap(
+                        community -> community.get(Constants.COMMUNITY_ID).toString(),
+                        community -> (String) community.get(Constants.COMMUNITY_NAME)
+                ));
+
+        // Identify missing communityIds
+        List<String> missingCommunityIds = communityIds.stream()
+                .filter(id -> !communityDetailsMap.containsKey(id))
+                .collect(Collectors.toList());
+
+        // Fetch missing community data from PostgreSQL
+        if (!missingCommunityIds.isEmpty()) {
+            List<Object> postgresResults = fetchCommunityFromPrimary(missingCommunityIds);
+            for (Object community : postgresResults) {
+                Map<String, Object> communityMap = (Map<String, Object>) community;
+                communityDetailsMap.put(
+                        communityMap.get(Constants.COMMUNITY_ID_KEY).toString(),
+                        (String) communityMap.get(Constants.COMMUNITY_NAME)
+                );
+            }
+        }
+
+        // Enhance discussions with community data
+        discussions.forEach(discussion -> {
+            String communityId = (String) discussion.get(Constants.COMMUNITY_ID);
+            if (communityDetailsMap.containsKey(communityId)) {
+                discussion.put(Constants.COMMUNITY_NAME, communityDetailsMap.get(communityId));
+            }
+        });
+    }
+
+    private List<Object> fetchCommunityFromPrimary(List<String> communityIds) {
+        log.info("Fetching community data from PostgreSQL");
+        List<Object> communityList = new ArrayList<>();
+        long startTime = System.currentTimeMillis();
+
+        List<CommunityEntity> communityEntities = communityEngagementRepository.findAllById(communityIds);
+        updateMetricsDbOperation(Constants.DISCUSSION_SEARCH, Constants.POSTGRES, Constants.READ, startTime);
+
+        communityList = communityEntities.stream()
+                .map(communityEntity -> {
+                    Map<String, Object> communityMap = new HashMap<>();
+                    communityMap.put(Constants.COMMUNITY_ID_KEY, communityEntity.getCommunityId());
+                    communityMap.put(Constants.COMMUNITY_NAME, communityEntity.getData().get(Constants.COMMUNITY_NAME).asText());
+                    return communityMap;
+                })
+                .collect(Collectors.toList());
+
+        return communityList;
+    }
 }
