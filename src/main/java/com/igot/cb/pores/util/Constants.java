@@ -194,6 +194,7 @@ public class Constants {
     public static final String DISCUSSION_TEXT = "discussionText";
     public static final String COMMUNITY_NAME = "communityName";
     public static final String COMMUNITY_PREFIX = "community_";
+    public static final String NO_COMMUNITY_FOUND = "No community found";
 
     private Constants() {
     }
