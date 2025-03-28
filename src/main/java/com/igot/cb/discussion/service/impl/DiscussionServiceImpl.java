@@ -1801,6 +1801,9 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
 
         populateCommunityIds(userId, searchCriteria);
+        if(CollectionUtils.isEmpty((Set<String>)searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID))){
+            return returnErrorMsg(Constants.NO_COMMUNITY_FOUND, HttpStatus.OK, response, Constants.SUCCESS);
+        }
         response = searchDiscussion(searchCriteria, isOverride);
         return response;
     }
