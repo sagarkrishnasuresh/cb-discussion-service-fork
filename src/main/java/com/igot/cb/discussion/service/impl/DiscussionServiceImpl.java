@@ -136,18 +136,14 @@ public class DiscussionServiceImpl implements DiscussionService {
             discussionDetailsNode.put(Constants.STATUS, Constants.ACTIVE);
 
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
-
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            ZonedDateTime zonedDateTime = currentTime.toInstant().atZone(ZoneId.systemDefault());
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.TIME_FORMAT);
-            String formattedCurrentTime = zonedDateTime.format(formatter);
 
             UUID id = UUIDs.timeBased();
             discussionDetailsNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
-            discussionDetailsNode.put(Constants.CREATED_ON, formattedCurrentTime);
-            discussionDetailsNode.put(Constants.UPDATED_ON, formattedCurrentTime);
+            discussionDetailsNode.put(Constants.CREATED_ON, getFormattedCurrentTime(currentTime));
+            discussionDetailsNode.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
             jsonNodeEntity.setUpdatedOn(currentTime);
             jsonNodeEntity.setIsActive(true);
             discussionDetailsNode.put(Constants.IS_ACTIVE, true);
@@ -167,7 +163,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + discussionDetails.get(Constants.COMMUNITY_ID).asText());
             deleteCacheByCommunity(Constants.DISCUSSION_POSTS_BY_USER + discussionDetails.get(Constants.COMMUNITY_ID).asText() + Constants.UNDER_SCORE + userId);
             updateCacheForFirstFivePages(discussionDetails.get(Constants.COMMUNITY_ID).asText(), false);
-            updateCacheForGlobalFeed(token);
+            updateCacheForGlobalFeed(userId);
             log.info("Updated cache for global feed");
             Map<String, String> communityObject = new HashMap<>();
             communityObject.put(Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText());
@@ -182,12 +178,11 @@ public class DiscussionServiceImpl implements DiscussionService {
         return response;
     }
 
-    private void updateCacheForGlobalFeed(String token) {
+    private void updateCacheForGlobalFeed(String userId) {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             SearchCriteria searchCriteria = objectMapper.readValue(filterCriteriaForGlobalFeed, SearchCriteria.class);
-            getGlobalFeed(searchCriteria, token, true);
-            //call the new method
+            getGlobalFeedUsingUserId(searchCriteria, userId, true);
         } catch (Exception e) {
             log.error("Error occured while updating the cache for globalFeed", e);
             throw new RuntimeException("Error parsing filter criteria JSON", e);
@@ -292,9 +287,12 @@ public class DiscussionServiceImpl implements DiscussionService {
             updateDataNode.remove(Constants.DISCUSSION_ID);
             data.setAll(updateDataNode);
 
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            data.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
-            discussionDbData.setUpdatedOn(currentTime);
+            if (!updateData.has(Constants.IS_INITIAL_UPLOAD) || !updateData.get(Constants.IS_INITIAL_UPLOAD).asBoolean()) {
+                Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+                data.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
+                discussionDbData.setUpdatedOn(currentTime);
+            }
+
             discussionDbData.setData(data);
             long postgresInsertTime = System.currentTimeMillis();
             discussionRepository.save(discussionDbData);
@@ -319,7 +317,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.getParams().setStatus(Constants.SUCCESS);
             deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + communityId);
             updateCacheForFirstFivePages(communityId, false);
-            updateCacheForGlobalFeed(token);
+            updateCacheForGlobalFeed(userId);
             log.info("Updated cache for global feed");
         } catch (Exception e) {
             log.error("Failed to update the discussion: ", e);
@@ -457,7 +455,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         }
                         deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + map.get(Constants.COMMUNITY_ID));
                         updateCacheForFirstFivePages((String) map.get(Constants.COMMUNITY_ID),false);
-                        updateCacheForGlobalFeed(token);
+                        updateCacheForGlobalFeed(userId);
                         log.info("Updated cache for global feed");
                         producer.push(communityPostCount, communityObject);
                         return response;
@@ -571,6 +569,15 @@ public class DiscussionServiceImpl implements DiscussionService {
             discussionRepository.save(discussionDbData);
             esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), discussionData, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), discussionData);
+            updateCacheForGlobalFeed(userId);
+            updateCacheForFirstFivePages(discussionDbData.getData().get(Constants.COMMUNITY_ID).asText(), false);
+            if (Constants.ANSWER_POST.equals(type)) {
+                redisTemplate.opsForValue()
+                        .getAndDelete(generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
+                                (String) discussionData.get(Constants.PARENT_DISCUSSION_ID),
+                                (String) discussionData.get(Constants.COMMUNITY_ID),
+                                Constants.ANSWER_POST)));
+            }
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);
         } catch (Exception e) {
@@ -764,9 +771,12 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
             answerPostDataNode.put(Constants.CREATED_ON, getFormattedCurrentTime(currentTime));
+            answerPostDataNode.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
             jsonNodeEntity.setIsActive(true);
             answerPostDataNode.put(Constants.IS_ACTIVE, true);
             jsonNodeEntity.setData(answerPostDataNode);
+            jsonNodeEntity.setCreatedOn(currentTime);
+            jsonNodeEntity.setUpdatedOn(currentTime);
             long timer = System.currentTimeMillis();
             discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.INSERT, timer);
@@ -785,13 +795,14 @@ public class DiscussionServiceImpl implements DiscussionService {
                     answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText(),
                     answerPostData.get(Constants.COMMUNITY_ID).asText(),
                     Constants.ANSWER_POST)));
+            // update global feed cache
+            updateCacheForGlobalFeed(userId);
             Map<String, String> communityObject = new HashMap<>();
             communityObject.put(Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText());
             communityObject.put(Constants.STATUS, Constants.INCREMENT);
             communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
             producer.push(communityPostCount, communityObject);
 
-            //updateCacheForFirstFivePages(answerPostData.get(Constants.COMMUNITY_ID).asText());
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
@@ -979,7 +990,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
             deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + data.get(Constants.COMMUNITY_ID).asText());
             updateCacheForFirstFivePages(data.get(Constants.COMMUNITY_ID).asText(),false);
-            updateCacheForGlobalFeed(token);
+            updateCacheForGlobalFeed(userId);
             log.info("Updated cache for global feed");
             map.put(Constants.DISCUSSION_ID, reportData.get(Constants.DISCUSSION_ID));
             response.setResult(map);
@@ -1137,10 +1148,12 @@ public class DiscussionServiceImpl implements DiscussionService {
         try {
             ObjectNode answerPostDataNode = (ObjectNode) answerPostData;
             answerPostDataNode.remove(Constants.ANSWER_POST_ID);
-            //answerPostDataNode.put("updatedBy", userId);
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            answerPostDataNode.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
-            discussionEntity.setUpdatedOn(currentTime);
+
+            if (!answerPostDataNode.has(Constants.IS_INITIAL_UPLOAD) || !answerPostDataNode.get(Constants.IS_INITIAL_UPLOAD).asBoolean()) {
+                Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+                answerPostDataNode.put(Constants.UPDATED_ON, getFormattedCurrentTime(currentTime));
+                discussionEntity.setUpdatedOn(currentTime);
+            }
             data.setAll(answerPostDataNode);
             discussionEntity.setData(data);
             long timer = System.currentTimeMillis();
@@ -1789,12 +1802,19 @@ public class DiscussionServiceImpl implements DiscussionService {
         return errList.isEmpty() ? "" : "Failed Due To Missing or Invalid Params - " + errList + ".";
     }
 
-
-
-
+    @Override
     public ApiResponse getGlobalFeed(SearchCriteria searchCriteria, String token, boolean isOverride) {
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_GET_GLOBAL_FEED_API);
         String userId = accessTokenValidator.verifyUserToken(token);
+
+        if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
+            return returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
+        }
+        return getGlobalFeedUsingUserId(searchCriteria, userId, isOverride);
+    }
+
+    private ApiResponse getGlobalFeedUsingUserId(SearchCriteria searchCriteria, String userId, boolean isOverride) {
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_GET_GLOBAL_FEED_API);
 
         if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
             return returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);

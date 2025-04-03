@@ -202,6 +202,7 @@ public class Constants {
     public static final String COMMUNITY_NAME = "communityName";
     public static final String COMMUNITY_PREFIX = "community_";
     public static final String NO_COMMUNITY_FOUND = "No community found";
+    public static final String IS_INITIAL_UPLOAD = "isInitialUpload";
 
     private Constants() {
     }
