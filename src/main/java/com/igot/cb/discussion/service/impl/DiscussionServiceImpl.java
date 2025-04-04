@@ -1556,6 +1556,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             filterCriteria.put(Constants.CATEGORY_TYPE, Arrays.asList(Constants.DOCUMENT));
         }
         filterCriteria.put(Constants.STATUS, Arrays.asList(Constants.ACTIVE, Constants.REPORTED));
+        filterCriteria.put(Constants.IS_ACTIVE, true);
         searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
 
         try {
