@@ -358,6 +358,10 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             searchCriteria.getFilterCriteriaMap().put(Constants.IS_ACTIVE, true);
             searchCriteria.getFilterCriteriaMap().put(Constants.STATUS, Arrays.asList(Constants.ACTIVE,Constants.REPORTED));
+            if (isTrending) {
+                List<String> communityIds = getTrendingPosts();
+                searchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, communityIds);
+            }
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
             if (CollectionUtils.isEmpty(searchResult.getData())) {
                 createErrorResponse(response, Constants.NO_DATA_FOUND, HttpStatus.OK, Constants.SUCCESS);
@@ -1552,6 +1556,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             filterCriteria.put(Constants.CATEGORY_TYPE, Arrays.asList(Constants.DOCUMENT));
         }
         filterCriteria.put(Constants.STATUS, Arrays.asList(Constants.ACTIVE, Constants.REPORTED));
+        filterCriteria.put(Constants.IS_ACTIVE, true);
         searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
 
         try {
@@ -1918,5 +1923,31 @@ public class DiscussionServiceImpl implements DiscussionService {
                 .collect(Collectors.toList());
 
         return communityList;
+    }
+
+    private List<String> getTrendingPosts() {
+        SearchCriteria searchCriteria = new SearchCriteria();
+        searchCriteria.setFilterCriteriaMap(new HashMap<>());
+        searchCriteria.setRequestedFields(Arrays.asList(Constants.COMMUNITY_ID));
+        searchCriteria.getFilterCriteriaMap().put(Constants.STATUS, Constants.ACTIVE);
+        searchCriteria.setOrderBy(Constants.COUNT_OF_ANSWER_POST_COUNT);
+        searchCriteria.setOrderDirection(Constants.DESC);
+        searchCriteria.setPageNumber(0);
+        searchCriteria.setPageSize(10);
+        SearchResult result = null;
+        List<String> communityIds = new ArrayList<>();
+        try {
+            result = esUtilService.searchDocuments(cbServerProperties.getCommunityEntity(), searchCriteria, cbServerProperties.getElasticCommunityJsonPath());
+
+            if (CollectionUtils.isNotEmpty(result.getData())) {
+                List<Map<String, Object>> communities = result.getData();
+                for (Map<String, Object> community : communities) {
+                    communityIds.add((String) community.get(Constants.COMMUNITY_ID));
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error occurred while fetching trending communities", e);
+        }
+        return communityIds;
     }
 }

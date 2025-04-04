@@ -305,7 +305,7 @@ public class EsUtilServiceImpl implements EsUtilService {
                     Constants.ASC.equalsIgnoreCase(searchCriteria.getOrderDirection()) ? SortOrder.ASC : SortOrder.DESC;
             Map<String, Object> schemaMap = readJsonSchema(JsonFilePath);
             Map<String, Object> fieldMap = (Map<String, Object>) schemaMap.get(searchCriteria.getOrderBy());
-            if (MapUtils.isNotEmpty(fieldMap) && fieldMap.get(Constants.TYPE).equals(Constants.NUMBER)) {
+            if (MapUtils.isNotEmpty(fieldMap) && (fieldMap.get(Constants.TYPE).equals(Constants.NUMBER) || fieldMap.get(Constants.TYPE).equals(Constants.LONG))) {
                 searchSourceBuilder.sort(
                         SortBuilders.fieldSort(searchCriteria.getOrderBy()).order(sortOrder));
             } else {

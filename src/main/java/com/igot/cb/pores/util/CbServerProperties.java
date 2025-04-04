@@ -51,4 +51,10 @@ public class CbServerProperties {
 
   @Value("${filter.criteria.trending.feed}")
   private String filterCriteriaTrendingFeed;
+
+  @Value("${elastic.required.field.community.json.path}")
+  private String elasticCommunityJsonPath;
+
+  @Value("${community.entity}")
+  private String communityEntity;
 }
