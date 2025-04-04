@@ -1,0 +1,112 @@
+{
+  "communityId": {
+    "type": "keyword"
+  },
+  "communityName": {
+    "type": "text",
+    "fields": {
+      "raw": {
+        "type": "keyword"
+      }
+    }
+  },
+  "status": {
+    "type": "keyword"
+  },
+  "description": {
+    "type": "text"
+  },
+  "communityAccessLevel": {
+    "type": "keyword"
+  },
+  "orgId": {
+    "type": "keyword"
+  },
+  "posterImageUrl": {
+    "type": "keyword"
+  },
+  "imageUrl": {
+    "type": "keyword"
+  },
+  "tags": {
+    "type": "keyword"
+  },
+  "topicName": {
+    "type": "keyword"
+  },
+  "countOfPeopleJoined": {
+    "type": "long"
+  },
+  "countOfPeopleLiked": {
+    "type": "long"
+  },
+  "communityTagId": {
+    "type": "keyword"
+  },
+  "topicId": {
+    "type": "long"
+  },
+  "createdOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "updatedOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "createdBy": {
+    "type": "keyword"
+  },
+  "updatedBy": {
+    "type": "keyword"
+  },
+  "communityGuideLines": {
+    "type": "keyword"
+  },
+  "searchTags": {
+    "type": "keyword"
+  },
+  "countOfPostCreated": {
+    "type": "long"
+  },
+  "competencies_v6": {
+    "type": "keyword"
+  },
+  "competencyArea": {
+    "type": "keyword"
+  },
+  "competencyTheme": {
+    "type": "keyword"
+  },
+  "competencySubTheme": {
+    "type": "keyword"
+  },
+  "countOfAnswerPost": {
+    "type": "long"
+  },
+  "reportedBy": {
+    "type": "keyword"
+  },
+  "orgName": {
+    "type": "keyword"
+  },
+  "publishedOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "countOfModerators": {
+    "type": "long"
+  },
+  "publishedBy": {
+    "type": "keyword"
+  }
+}
