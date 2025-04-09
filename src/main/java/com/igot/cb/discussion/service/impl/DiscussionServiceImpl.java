@@ -560,6 +560,18 @@ public class DiscussionServiceImpl implements DiscussionService {
                     createErrorResponse(response, Constants.FAILED_TO_VOTE, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
                     return response;
                 }
+
+                Map<String, String> communityObject = new HashMap<>();
+                communityObject.put(Constants.COMMUNITY_ID,
+                        discussionDbData.getData().get(Constants.COMMUNITY_ID).asText());
+                communityObject.put(Constants.STATUS, Constants.DECREMENT);
+                communityObject.put(Constants.DISCUSSION_ID, discussionId);
+                if (Constants.UP.equals(voteType)) {
+                    communityObject.put(Constants.STATUS, Constants.INCREMENT);
+                } else if (Constants.DOWN.equals(voteType)) {
+                    communityObject.put(Constants.STATUS, Constants.DECREMENT);
+                }
+                producer.push(communityLikeCount, communityObject);
             }
 
             if (voteType.equals(Constants.UP)) {
