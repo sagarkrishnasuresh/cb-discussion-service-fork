@@ -191,7 +191,6 @@ public class Constants {
     public static final String LIKES = "likes";
     public static final String BOOKMARKS = "bookmarks";
     public static final String COMMUNITY_FILTERS = "communityFilters";
-
     public static final String CATEGORY_TYPE = "categoryType";
     public static final Object DOCUMENT_CATEGORY = "document";
     public static final String DISCUSSION_DOCUMENT_POST = "discussionDocumentPost_";
@@ -205,6 +204,20 @@ public class Constants {
     public static final String IS_INITIAL_UPLOAD = "isInitialUpload";
     public static final String COUNT_OF_ANSWER_POST_COUNT = "countOfAnswerPost";
     public static final String LONG = "long";
+    public static final String ANSWER_POST_REPLY_VALIDATION_SCHEMA = "answerPostReplyValidation";
+    public static final String ANSWER_POST_REPLY = "answerPostReply";
+    public static final String PARENT_ANSWER_POST_ID = "parentAnswerPostId";
+    public static final String INVALID_PARENT_ANSWER_POST_ID = "invalid Parent answerPostId Please provide a valid answerPostId";
+    public static final String FAILED_TO_CREATE_ANSWER_POST_REPLY = "Failed to create answerPostReply post";
+    public static final String ANSWER_POST_REPLY_UPDATE_VALIDATION_SCHEMA = "answerPostReplyUpdateValidation";
+    public static final String ANSWER_POST_REPLY_ID = "answerPostReplyId";
+    public static final String INVALID_ANSWER_POST_REPLY_ID = "invalid answerPostReplyId";
+    public static final String POST_ALREADY_SUSPENDED = "Post Already suspended";
+    public static final String DELETE_ANSWER_POST_REPLY_API = "api.delete.answerPostReply";
+    public static final String ANSWER_POST_REPLY_UPDATE_API = "api.discussion.updateAnswerPostReply";
+    public static final String ANSWER_POST_REPLY_READ_API = "api.discussion.AnswerPostReply.read";
+    public static final String ANSWER_POST_REPLIES = "answerPostReplies";
+    public static final String ANSWER_POST_REPLIES_COUNT = "answerPostRepliesCount";
 
     private Constants() {
     }

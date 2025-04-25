@@ -1,5 +1,6 @@
 package com.igot.cb.discussion.controller;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.igot.cb.discussion.service.AnswerPostReplyService;
 import com.igot.cb.discussion.service.DiscussionService;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.util.ApiResponse;
@@ -18,6 +19,9 @@ public class DiscussionController {
 
     @Autowired
     DiscussionService discussionService;
+
+    @Autowired
+    AnswerPostReplyService answerPostReplyService;
 
     @PostMapping("/create")
     public ResponseEntity<ApiResponse> createDiscussion(@RequestBody JsonNode discussionDetails,
@@ -154,6 +158,47 @@ public class DiscussionController {
     public ResponseEntity<ApiResponse> getGlobalFeed(@RequestBody SearchCriteria searchCriteria,
                                                      @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = discussionService.getGlobalFeed(searchCriteria, token, false);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/answerPostReply/create")
+    public ResponseEntity<ApiResponse> createAnswerPostReply(@RequestBody JsonNode answerPostReplyData,
+                                                             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = answerPostReplyService.createAnswerPostReply(answerPostReplyData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @GetMapping("/answerPostReply/read/{discussionId}")
+    public ResponseEntity<ApiResponse> readAnswerPostReply(@PathVariable String discussionId) {
+        ApiResponse response = answerPostReplyService.readAnswerPostReply(discussionId);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/answerPostReply/update")
+    public ResponseEntity<ApiResponse> updateAnswerPostReply(@RequestBody JsonNode updateData,
+                                                             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = answerPostReplyService.updateAnswerPostReply(updateData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @DeleteMapping("/answerPostReply/delete/{discussionId}")
+    public ResponseEntity<ApiResponse> deleteAnswerPostReply(@PathVariable String discussionId,
+                                                             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = answerPostReplyService.deleteAnswerPostReply(discussionId, Constants.ANSWER_POST_REPLY, token);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PostMapping("/answerPostReply/like/{discussionId}")
+    public ResponseEntity<ApiResponse> AnswerPostReplyLike(@PathVariable String discussionId,
+                                                           @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.upVote(discussionId, Constants.ANSWER_POST_REPLY, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/answerPostReply/dislike/{discussionId}")
+    public ResponseEntity<ApiResponse> AnswerPostReplyDislike(@PathVariable String discussionId,
+                                                              @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = discussionService.downVote(discussionId, Constants.ANSWER_POST_REPLY, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 }

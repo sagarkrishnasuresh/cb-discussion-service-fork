@@ -46,6 +46,15 @@
   "parentDiscussionId": {
     "type": "keyword"
   },
+  "parentAnswerPostId": {
+    "type": "keyword"
+  },
+  "answerPostRepliesCount": {
+    "type": "number"
+  },
+  "answerPostReplies": {
+    "type": "keyword"
+  },
   "status": {
     "type": "keyword"
   },

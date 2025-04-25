@@ -57,4 +57,14 @@ public class CbServerProperties {
 
   @Value("${community.entity}")
   private String communityEntity;
+
+  @Value("${kafka.topic.community.discusion.post.count}")
+  private String communityPostCount;
+
+  @Value("${kafka.topic.community.discusion.like.count}")
+  private String communityLikeCount;
+
+  @Value("${filter.criteria.global.feed}")
+  private String filterCriteriaForGlobalFeed;
+
 }
