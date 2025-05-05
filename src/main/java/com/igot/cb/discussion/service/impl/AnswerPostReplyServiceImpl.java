@@ -19,6 +19,7 @@ import com.igot.cb.pores.elasticsearch.service.EsUtilService;
 import com.igot.cb.pores.util.*;
 import com.igot.cb.transactional.cassandrautils.CassandraOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -26,7 +27,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -372,5 +377,270 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         criteria.setOrderDirection(Constants.DESC);
         criteria.setFacets(Collections.emptyList());
         return criteria;
+    }
+
+    @Override
+    public ApiResponse managePost(Map<String, Object> reportData, String token, String action) {
+        log.info("DiscussionServiceImpl::managePost");
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.ADMIN_MANAGE_POST_API);
+        String userId = accessTokenValidator.verifyUserToken(token);
+        if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
+            response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return response;
+        }
+
+        String errorMsg = validateSuspendPostPayload(reportData);
+        if (StringUtils.isNotEmpty(errorMsg)) {
+            return ProjectUtil.returnErrorMsg(errorMsg, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+
+        try {
+            String discussionId = (String) reportData.get(Constants.DISCUSSION_ID);
+            String type = (String) reportData.get(Constants.TYPE);
+            Object entityObject = Constants.ANSWER_POST_REPLY.equals(type)
+                    ? discussionAnswerPostReplyRepository.findById(discussionId).orElse(null)
+                    : discussionRepository.findById(discussionId).orElse(null);
+
+            if (entityObject == null) {
+                return ProjectUtil.returnErrorMsg(Constants.DISCUSSION_NOT_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
+            }
+
+            JsonNode dataNode;
+            Boolean isActive;
+            if (Constants.ANSWER_POST_REPLY.equals(type)) {
+                DiscussionAnswerPostReplyEntity replyEntity = (DiscussionAnswerPostReplyEntity) entityObject;
+                dataNode = replyEntity.getData();
+                isActive = replyEntity.getIsActive();
+            } else {
+                DiscussionEntity discussionEntity = (DiscussionEntity) entityObject;
+                dataNode = discussionEntity.getData();
+                isActive = discussionEntity.getIsActive();
+            }
+
+            ObjectNode data = (ObjectNode) dataNode;
+            if (!isActive) {
+                return ProjectUtil.returnErrorMsg(Constants.DISCUSSION_IS_INACTIVE, HttpStatus.CONFLICT, response, Constants.FAILED);
+            }
+            if(data.get(Constants.STATUS).asText().equals(Constants.ACTIVE) && action.equals(Constants.SUSPEND)){
+                return ProjectUtil.returnErrorMsg(Constants.POST_IS_ACTIVE_MSG, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            }
+
+            if (data.get(Constants.STATUS).asText().equals(Constants.SUSPENDED) && action.equals(Constants.SUSPEND) ||
+                    data.get(Constants.STATUS).asText().equals(Constants.ACTIVE) && action.equals(Constants.ACTIVE)) {
+                return ProjectUtil.returnErrorMsg(Constants.POST_ERROR_MSG + data.get(Constants.STATUS).asText() + ".", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            }
+
+            if (Constants.SUSPEND.equals(action)) {
+                data.put(Constants.STATUS, Constants.SUSPENDED);
+                data.put(Constants.UPDATED_ON, DiscussionServiceUtil.getFormattedCurrentTime(new Timestamp(System.currentTimeMillis())));
+                data.put(Constants.UPDATED_BY, userId);
+            } else if (Constants.ACTIVE.equals(action)) {
+                data.put(Constants.STATUS, Constants.ACTIVE);
+                data.put(Constants.UPDATED_ON, DiscussionServiceUtil.getFormattedCurrentTime(new Timestamp(System.currentTimeMillis())));
+                data.put(Constants.UPDATED_BY, userId);
+                Map<String, Object> propertyMap = new HashMap<>();
+                propertyMap.put(Constants.DISCUSSION_ID, discussionId);
+                cassandraOperation.deleteRecord(
+                        Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, propertyMap);
+            }
+
+            if (Constants.ANSWER_POST_REPLY.equals(type)) {
+                DiscussionAnswerPostReplyEntity replyEntity = (DiscussionAnswerPostReplyEntity) entityObject;
+                replyEntity.setData(dataNode);
+                discussionAnswerPostReplyRepository.save(replyEntity);
+            } else {
+                DiscussionEntity discussionEntity = (DiscussionEntity) entityObject;
+                discussionEntity.setData(dataNode);
+                discussionRepository.save(discussionEntity);
+            }
+
+            ObjectNode jsonNode = objectMapper.createObjectNode();
+            jsonNode.setAll(data);
+            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+            cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
+        } catch (Exception e) {
+            log.error("Failed to suspend post: {}", e.getMessage(), e);
+            DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
+            return response;
+        }
+        return response;
+    }
+
+    private String validateSuspendPostPayload(Map<String, Object> reportData) {
+        StringBuilder errorMsg = new StringBuilder();
+        List<String> errList = new ArrayList<>();
+
+        if (reportData == null) {
+            errorMsg.append("Failed Due To Missing Params - ").append(Constants.DISCUSSION_ID).append(",").append(Constants.TYPE).append(".");
+            return errorMsg.toString();
+        }
+
+        if (StringUtils.isBlank((String) reportData.get(Constants.DISCUSSION_ID))) {
+            errList.add(Constants.DISCUSSION_ID);
+        }
+        if (StringUtils.isBlank((String) reportData.get(Constants.TYPE))) {
+            errList.add(Constants.TYPE);
+        } else if (!Constants.ANSWER_POST.equalsIgnoreCase((String) reportData.get(Constants.TYPE)) &&
+                !Constants.QUESTION.equalsIgnoreCase((String) reportData.get(Constants.TYPE)) &&
+                !Constants.ANSWER_POST_REPLY.equalsIgnoreCase((String) reportData.get(Constants.TYPE))) {
+            errList.add("type must be either 'question' or 'AnswerPost' or 'AnswerPostReply'");
+        }
+
+        if (!errList.isEmpty()) {
+            errorMsg.append("Failed Due To Missing Params - ").append(errList).append(".");
+        }
+        return errorMsg.toString();
+    }
+
+    @Override
+    public ApiResponse getReportStatistics(Map<String, Object> getReportData) {
+        log.info("DiscussionServiceImpl::getReportStatistics");
+        ApiResponse response = ProjectUtil.createDefaultResponse(Constants.GET_REPORT_STATISTICS_API);
+
+        String errorMsg = validateSuspendPostPayload(getReportData);
+        if (StringUtils.isNotEmpty(errorMsg)) {
+            return ProjectUtil.returnErrorMsg(errorMsg, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+        }
+
+        try {
+            String discussionId = (String) getReportData.get(Constants.DISCUSSION_ID);
+            String redisKey = Constants.REPORT_STATISTICS_CACHE_PREFIX + discussionId;
+            String cachedStatistics = cacheService.getCache(redisKey);
+            if (StringUtils.isNotBlank(cachedStatistics)) {
+                log.info("Returning cached report statistics for discussionId: {}", discussionId);
+                response.setResult(objectMapper.readValue(cachedStatistics, new TypeReference<Map<String, Object>>() {
+                }));
+                return response;
+            }
+
+            String validReasonsKey = Constants.VALID_REASONS_CACHE_KEY;
+            Set<String> validReasons = null;
+            String cachedValidReasons = cacheService.getCache(validReasonsKey);
+            if (StringUtils.isNotBlank(cachedValidReasons)) {
+                validReasons = objectMapper.readValue(cachedValidReasons, new TypeReference<Set<String>>() {
+                });
+            } else {
+                Map<String, Object> configKey = new HashMap<>();
+                configKey.put(Constants.ID, Constants.DISCUSSION_REPORT_REASON_CONFIG);
+                List<Map<String, Object>> configData = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                        Constants.KEYSPACE_SUNBIRD, Constants.SYSTEM_SETTINGS, configKey, Arrays.asList(Constants.VALUE), null);
+
+                if (CollectionUtils.isEmpty(configData)) {
+                    return ProjectUtil.returnErrorMsg(Constants.REPORT_REASON_CONFIG_ERROR_MSG, HttpStatus.NOT_FOUND, response, Constants.FAILED);
+                }
+
+                validReasons = new ObjectMapper().readValue(
+                        (String) configData.get(0).get(Constants.VALUE), new TypeReference<Set<String>>() {
+                        });
+                if (validReasons.isEmpty()) validReasons = Collections.emptySet();
+                cacheService.putCache(validReasonsKey, validReasons);
+            }
+
+            Map<String, Object> propertyMap = new HashMap<>();
+            propertyMap.put(Constants.DISCUSSION_ID, discussionId);
+            List<Map<String, Object>> reportReasons = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                    Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, propertyMap, Arrays.asList(Constants.REASON), null);
+
+            if (CollectionUtils.isEmpty(reportReasons)) {
+                return ProjectUtil.returnErrorMsg(Constants.NO_REPORT_REASON_FOUND_ERROR_MSG, HttpStatus.OK, response, Constants.FAILED);
+            }
+
+            Map<String, Integer> reasonCountMap = new HashMap<>();
+            int totalCount = 0;
+
+            for (Map<String, Object> report : reportReasons) {
+                String reasons = (String) report.get(Constants.REASON);
+                if (StringUtils.isNotBlank(reasons)) {
+                    for (String reason : reasons.split(Constants.COMMA)) {
+                        reason = reason.trim();
+                        if (validReasons.contains(reason)) {
+                            reasonCountMap.put(reason, reasonCountMap.getOrDefault(reason, 0) + 1);
+                            totalCount++;
+                        }
+                    }
+                }
+            }
+
+            Map<String, Map<String, Object>> statsMap = new HashMap<>();
+            for (String reason : validReasons) {
+                int count = reasonCountMap.getOrDefault(reason, 0);
+                double percentage = totalCount > 0 ? (count * 100.0) / totalCount : 0.0;
+                Map<String, Object> reasonStats = new HashMap<>();
+                reasonStats.put(Constants.COUNT, count);
+                reasonStats.put(Constants.PERCENTAGE, percentage);
+                statsMap.put(reason, reasonStats);
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put(Constants.TOTAL_COUNT, totalCount);
+            result.put(Constants.REPORT_REASONS, statsMap);
+
+            cacheService.putCache(redisKey, result);
+            response.getResult().putAll(result);
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to get report statistics", e);
+            DiscussionServiceUtil.createErrorResponse(response, Constants.GET_REPORT_STATISTICS_ERROR_MSG, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
+            return response;
+        }
+    }
+
+    public ApiResponse migrateRecentReportedTime() {
+        log.info("DiscussionServiceImpl::migrateRecentReportedTime");
+        ApiResponse response = ProjectUtil.createDefaultResponse("api.discussion.migrateRecentReportedTime");
+        try {
+            Map<String, Object> propertyMap = new HashMap<>();
+            List<Map<String, Object>> reportedDiscussionIds = cassandraOperation.getRecordsByPropertiesByKey(
+                    Constants.KEYSPACE_SUNBIRD,
+                    Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST,
+                    propertyMap,
+                    Arrays.asList(Constants.DISCUSSION_ID, Constants.CREATED_ON_KEY), ""
+            );
+
+            Map<String, Date> latestReportedTimeMap = new HashMap<>();
+
+            for (Map<String, Object> record : reportedDiscussionIds) {
+                String discussionId = (String) record.get(Constants.DISCUSSION_ID_KEY);
+                Date createdOn = (Date) record.get(Constants.CREATED_ON_KEY);
+                if (latestReportedTimeMap.containsKey(discussionId)) {
+                    Date existingTime = latestReportedTimeMap.get(discussionId);
+                    if (createdOn.after(existingTime)) {
+                        latestReportedTimeMap.put(discussionId, createdOn);
+                    }
+                } else {
+                    latestReportedTimeMap.put(discussionId, createdOn);
+                }
+            }
+            log.info("Latest reported times: {}", latestReportedTimeMap);
+
+            for (String discussionId : latestReportedTimeMap.keySet()) {
+                Optional<DiscussionEntity> discussionEntityOptional = discussionRepository.findById(discussionId);
+                if (discussionEntityOptional.isPresent()) {
+                    DiscussionEntity discussionEntity = discussionEntityOptional.get();
+                    ObjectNode data = (ObjectNode) discussionEntity.getData();
+
+                    data.put(Constants.RECENT_REPORTED_ON, getFormattedCurrentTime(latestReportedTimeMap.get(discussionId)));
+                    discussionEntity.setData(data);
+                    discussionRepository.save(discussionEntity);
+                    Map<String, Object> map = objectMapper.convertValue(data, Map.class);
+                    esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+                }
+            }
+            response.setResponseCode(HttpStatus.OK);
+            response.getParams().setStatus(Constants.SUCCESS);
+            response.getResult().putAll(latestReportedTimeMap);
+        } catch (Exception e) {
+            log.error("Failed to migrate recent reported time", e);
+            DiscussionServiceUtil.createErrorResponse(response, "migrate data failed", HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
+        }
+        return response;
+    }
+
+    private String getFormattedCurrentTime(Date currentTime) {
+        ZonedDateTime zonedDateTime = currentTime.toInstant().atZone(ZoneId.systemDefault());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.TIME_FORMAT);
+        return zonedDateTime.format(formatter);
     }
 }

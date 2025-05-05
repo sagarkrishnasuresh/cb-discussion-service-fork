@@ -61,6 +61,16 @@
   "reportedBy": {
     "type": "keyword"
   },
+  "recentReportedOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "updatedBy": {
+    "type": "keyword"
+  },
   "categoryType": {
     "type": "keyword"
   },

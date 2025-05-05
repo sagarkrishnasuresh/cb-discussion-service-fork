@@ -218,6 +218,27 @@ public class Constants {
     public static final String ANSWER_POST_REPLY_READ_API = "api.discussion.AnswerPostReply.read";
     public static final String ANSWER_POST_REPLIES = "answerPostReplies";
     public static final String ANSWER_POST_REPLIES_COUNT = "answerPostRepliesCount";
+    public static final String SUSPEND = "suspend";
+    public static final String UPDATED_BY = "updatedBy";
+    public static final String EXCEPTION_MSG_DELETE = "Exception occurred while deleting record from ";
+    public static final String POST_ERROR_MSG = "Post is already ";
+    public static final String ADMIN_MANAGE_POST_API = "api.discussion.admin.managePost";
+    public static final String POST_IS_ACTIVE_MSG = "Post is active";
+    public static final String GET_REPORT_STATISTICS_API = "api.discussion.getReportStatistics";
+    public static final String REPORT_STATISTICS_CACHE_PREFIX = "post_report_statistics:";
+    public static final String VALID_REASONS_CACHE_KEY = "post_report_reasons";
+    public static final String COUNT = "count";
+    public static final String PERCENTAGE = "percentage";
+    public static final String TOTAL_COUNT = "totalCount";
+    public static final String REPORT_REASONS = "reportReasons";
+    public static final String VALUE = "value";
+    public static final String DISCUSSION_REPORT_REASON_CONFIG = "discussionReportReasonConfig";
+    public static final String SYSTEM_SETTINGS = "system_settings";
+    public static final String REPORT_REASON_CONFIG_ERROR_MSG = "Report reason configuration not found";
+    public static final String NO_REPORT_REASON_FOUND_ERROR_MSG = "No report reasons found for the given ID";
+    public static final String GET_REPORT_STATISTICS_ERROR_MSG = "Failed to get report statistics";
+    public static final String RECENT_REPORTED_ON = "recentReportedOn";
+    public static final String CREATED_ON_KEY = "createdon";
 
     private Constants() {
     }
