@@ -67,4 +67,25 @@ public class CbServerProperties {
   @Value("${filter.criteria.global.feed}")
   private String filterCriteriaForGlobalFeed;
 
+  @Value("${filter.criteria.mdo.all.report.feed}")
+  private String mdoAllReportFeed;
+
+  @Value("${filter.criteria.mdo.report.question.feed}")
+  private String mdoQuestionReportFeed;
+
+  @Value("${filter.criteria.mdo.report.answerPost.feed}")
+  private String mdoAnswerPostReportFeed;
+
+  @Value("${filter.criteria.mdo.report.answerPostReply.feed}")
+  private String mdoAnswerPostReplyReportFeed;
+
+  @Value("${filter.criteria.mdo.all.suspended.feed}")
+  private String mdoAllSuspendedFeed;
+
+  @Value("${filter.criteria.question.document.feed}")
+  private String filterCriteriaQuestionDocumentFeed;
+
+  @Value("${filter.criteria.question.user.feed}")
+  private String filterCriteriaQuestionUserFeed;
+
 }

@@ -383,11 +383,10 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
     public ApiResponse managePost(Map<String, Object> reportData, String token, String action) {
         log.info("DiscussionServiceImpl::managePost");
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.ADMIN_MANAGE_POST_API);
+
         String userId = accessTokenValidator.verifyUserToken(token);
-        if (StringUtils.isBlank(userId) || userId.equals(Constants.UNAUTHORIZED)) {
-            response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
-            response.setResponseCode(HttpStatus.BAD_REQUEST);
-            return response;
+        if (StringUtils.isBlank(userId) || Constants.UNAUTHORIZED.equals(userId)) {
+            return ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
 
         String errorMsg = validateSuspendPostPayload(reportData);
@@ -395,75 +394,99 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             return ProjectUtil.returnErrorMsg(errorMsg, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
         }
 
+        String discussionId = (String) reportData.get(Constants.DISCUSSION_ID);
+        String type = (String) reportData.get(Constants.TYPE);
+
         try {
-            String discussionId = (String) reportData.get(Constants.DISCUSSION_ID);
-            String type = (String) reportData.get(Constants.TYPE);
-            Object entityObject = Constants.ANSWER_POST_REPLY.equals(type)
+            Object entity = Constants.ANSWER_POST_REPLY.equals(type)
                     ? discussionAnswerPostReplyRepository.findById(discussionId).orElse(null)
                     : discussionRepository.findById(discussionId).orElse(null);
-
-            if (entityObject == null) {
+            if (entity == null) {
                 return ProjectUtil.returnErrorMsg(Constants.DISCUSSION_NOT_FOUND, HttpStatus.NOT_FOUND, response, Constants.FAILED);
             }
 
             JsonNode dataNode;
             Boolean isActive;
             if (Constants.ANSWER_POST_REPLY.equals(type)) {
-                DiscussionAnswerPostReplyEntity replyEntity = (DiscussionAnswerPostReplyEntity) entityObject;
-                dataNode = replyEntity.getData();
-                isActive = replyEntity.getIsActive();
+                DiscussionAnswerPostReplyEntity reply = (DiscussionAnswerPostReplyEntity) entity;
+                dataNode = reply.getData();
+                isActive = reply.getIsActive();
             } else {
-                DiscussionEntity discussionEntity = (DiscussionEntity) entityObject;
-                dataNode = discussionEntity.getData();
-                isActive = discussionEntity.getIsActive();
+                DiscussionEntity discussion = (DiscussionEntity) entity;
+                dataNode = discussion.getData();
+                isActive = discussion.getIsActive();
             }
 
             ObjectNode data = (ObjectNode) dataNode;
+            String currentStatus = data.get(Constants.STATUS).asText();
+
             if (!isActive) {
                 return ProjectUtil.returnErrorMsg(Constants.DISCUSSION_IS_INACTIVE, HttpStatus.CONFLICT, response, Constants.FAILED);
             }
-            if(data.get(Constants.STATUS).asText().equals(Constants.ACTIVE) && action.equals(Constants.SUSPEND)){
+
+            if (currentStatus.equals(Constants.ACTIVE) && Constants.SUSPEND.equals(action)) {
                 return ProjectUtil.returnErrorMsg(Constants.POST_IS_ACTIVE_MSG, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             }
 
-            if (data.get(Constants.STATUS).asText().equals(Constants.SUSPENDED) && action.equals(Constants.SUSPEND) ||
-                    data.get(Constants.STATUS).asText().equals(Constants.ACTIVE) && action.equals(Constants.ACTIVE)) {
-                return ProjectUtil.returnErrorMsg(Constants.POST_ERROR_MSG + data.get(Constants.STATUS).asText() + ".", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            if (currentStatus.equals(action)) {
+                return ProjectUtil.returnErrorMsg(Constants.POST_ERROR_MSG + currentStatus + ".", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             }
 
-            if (Constants.SUSPEND.equals(action)) {
-                data.put(Constants.STATUS, Constants.SUSPENDED);
-                data.put(Constants.UPDATED_ON, DiscussionServiceUtil.getFormattedCurrentTime(new Timestamp(System.currentTimeMillis())));
-                data.put(Constants.UPDATED_BY, userId);
-            } else if (Constants.ACTIVE.equals(action)) {
-                data.put(Constants.STATUS, Constants.ACTIVE);
-                data.put(Constants.UPDATED_ON, DiscussionServiceUtil.getFormattedCurrentTime(new Timestamp(System.currentTimeMillis())));
-                data.put(Constants.UPDATED_BY, userId);
+            data.put(Constants.STATUS, action);
+            data.put(Constants.UPDATED_ON, DiscussionServiceUtil.getFormattedCurrentTime(new Timestamp(System.currentTimeMillis())));
+            data.put(Constants.UPDATED_BY, userId);
+
+            if (Constants.ACTIVE.equals(action)) {
                 Map<String, Object> propertyMap = new HashMap<>();
                 propertyMap.put(Constants.DISCUSSION_ID, discussionId);
-                cassandraOperation.deleteRecord(
-                        Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, propertyMap);
+                cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, propertyMap);
+
+                List<Map<String, Object>> reportUsers = cassandraOperation.getRecordsByPropertiesByKey(
+                        Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER,
+                        propertyMap, Arrays.asList(Constants.USERID), null
+                );
+
+                for (Map<String, Object> map : reportUsers) {
+                    propertyMap.put(Constants.USERID, map.get(Constants.USERID));
+                    cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER, propertyMap);
+                    log.info("Deleted report record for user: {}, by admin: {}", map.get(Constants.USERID), userId);
+                }
             }
 
             if (Constants.ANSWER_POST_REPLY.equals(type)) {
-                DiscussionAnswerPostReplyEntity replyEntity = (DiscussionAnswerPostReplyEntity) entityObject;
-                replyEntity.setData(dataNode);
-                discussionAnswerPostReplyRepository.save(replyEntity);
+                ((DiscussionAnswerPostReplyEntity) entity).setData(dataNode);
+                discussionAnswerPostReplyRepository.save((DiscussionAnswerPostReplyEntity) entity);
             } else {
-                DiscussionEntity discussionEntity = (DiscussionEntity) entityObject;
-                discussionEntity.setData(dataNode);
-                discussionRepository.save(discussionEntity);
+                ((DiscussionEntity) entity).setData(dataNode);
+                discussionRepository.save((DiscussionEntity) entity);
             }
 
-            ObjectNode jsonNode = objectMapper.createObjectNode();
-            jsonNode.setAll(data);
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+            ObjectNode jsonNode = objectMapper.createObjectNode().setAll(data);
+            Map<String, Object> esMap = objectMapper.convertValue(jsonNode, Map.class);
+            esUtilService.updateDocument(
+                    cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId,
+                    esMap, cbServerProperties.getElasticDiscussionJsonPath()
+            );
+
+            Map<String, String> cachePrefixes = new HashMap<>();
+            cachePrefixes.put(Constants.SUSPEND, Constants.SUSPENDED_POSTS_CACHE_PREFIX);
+            cachePrefixes.put(Constants.ANSWER_POST, Constants.REPORTED_ANSWER_POST_POSTS_CACHE_PREFIX);
+            cachePrefixes.put(Constants.QUESTION, Constants.REPORTED_QUESTION_POSTS_CACHE_PREFIX);
+            cachePrefixes.put(Constants.ANSWER_POST_REPLY, Constants.REPORTED_ANSWER_POST_REPLY_POSTS_CACHE_PREFIX);
+
+            String communityId = data.get(Constants.COMMUNITY_ID).asText();
+            deleteCacheByPrefix(Constants.ALL_REPORTED_POSTS_CACHE_PREFIX + communityId);
+
+            if (cachePrefixes.containsKey(action)) {
+                deleteCacheByPrefix(cachePrefixes.get(action) + communityId);
+            }
+            if (cachePrefixes.containsKey(type)) {
+                deleteCacheByPrefix(cachePrefixes.get(type) + communityId);
+            }
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
         } catch (Exception e) {
-            log.error("Failed to suspend post: {}", e.getMessage(), e);
+            log.error("Failed to manage post: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
-            return response;
         }
         return response;
     }
@@ -642,5 +665,16 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         ZonedDateTime zonedDateTime = currentTime.toInstant().atZone(ZoneId.systemDefault());
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.TIME_FORMAT);
         return zonedDateTime.format(formatter);
+    }
+
+    private void deleteCacheByPrefix(String prefix) {
+        String pattern = prefix + "_*";
+        Set<String> keys = redisTemplate.keys(pattern);
+        if (!keys.isEmpty()) {
+            redisTemplate.delete(keys);
+            log.info("Deleted cache keys: {}", keys);
+        } else {
+            log.info("No cache keys found for pattern: {}", pattern);
+        }
     }
 }

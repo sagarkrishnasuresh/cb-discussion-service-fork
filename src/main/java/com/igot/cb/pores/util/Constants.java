@@ -239,6 +239,11 @@ public class Constants {
     public static final String GET_REPORT_STATISTICS_ERROR_MSG = "Failed to get report statistics";
     public static final String RECENT_REPORTED_ON = "recentReportedOn";
     public static final String CREATED_ON_KEY = "createdon";
+    public static final String SUSPENDED_POSTS_CACHE_PREFIX = "mdoSuspendedPosts_";
+    public static final String REPORTED_ANSWER_POST_REPLY_POSTS_CACHE_PREFIX = "mdoReportedAnswerPostReplyPosts_";
+    public static final String REPORTED_ANSWER_POST_POSTS_CACHE_PREFIX = "mdoReportedAnswerPostPosts_";
+    public static final String ALL_REPORTED_POSTS_CACHE_PREFIX = "mdoAllReportedPosts_";
+    public static final String REPORTED_QUESTION_POSTS_CACHE_PREFIX = "mdoReportedQuestionPosts_";
 
     private Constants() {
     }
