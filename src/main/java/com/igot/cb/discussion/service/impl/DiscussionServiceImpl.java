@@ -1616,7 +1616,8 @@ public class DiscussionServiceImpl implements DiscussionService {
         if (searchCriteria != null) {
 
             try {
-                if (searchCriteria.getFilterCriteriaMap().size() == 3
+                if (searchCriteria.getFilterCriteriaMap() != null
+                        && searchCriteria.getFilterCriteriaMap().size() == cbServerProperties.getUserFeedFilterCriteriaMapSize()
                         && searchCriteria.getFilterCriteriaMap().containsKey(Constants.CREATED_BY)
                         && searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY) instanceof String
                         && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)

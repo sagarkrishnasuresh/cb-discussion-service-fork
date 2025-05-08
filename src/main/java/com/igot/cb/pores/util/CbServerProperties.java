@@ -88,4 +88,7 @@ public class CbServerProperties {
   @Value("${filter.criteria.question.user.feed}")
   private String filterCriteriaQuestionUserFeed;
 
+  @Value("${user.feed.filter.criteriaMapSize}")
+  private int userFeedFilterCriteriaMapSize;
+
 }
