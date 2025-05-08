@@ -418,21 +418,23 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             }
 
             ObjectNode data = (ObjectNode) dataNode;
-            String currentStatus = data.get(Constants.STATUS).asText();
-
             if (!isActive) {
                 return ProjectUtil.returnErrorMsg(Constants.DISCUSSION_IS_INACTIVE, HttpStatus.CONFLICT, response, Constants.FAILED);
             }
-
-            if (currentStatus.equals(Constants.ACTIVE) && Constants.SUSPEND.equals(action)) {
+            if (data.get(Constants.STATUS).asText().equals(Constants.ACTIVE) && action.equals(Constants.SUSPEND)) {
                 return ProjectUtil.returnErrorMsg(Constants.POST_IS_ACTIVE_MSG, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             }
 
-            if (currentStatus.equals(action)) {
-                return ProjectUtil.returnErrorMsg(Constants.POST_ERROR_MSG + currentStatus + ".", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            if (data.get(Constants.STATUS).asText().equals(Constants.SUSPENDED) && action.equals(Constants.SUSPEND) ||
+                    data.get(Constants.STATUS).asText().equals(Constants.ACTIVE) && action.equals(Constants.ACTIVE)) {
+                return ProjectUtil.returnErrorMsg(Constants.POST_ERROR_MSG + data.get(Constants.STATUS).asText() + ".", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            }
+            if (Constants.SUSPEND.equals(action)) {
+                data.put(Constants.STATUS, Constants.SUSPENDED);
+            } else if (Constants.ACTIVE.equals(action)) {
+                data.put(Constants.STATUS, Constants.ACTIVE);
             }
 
-            data.put(Constants.STATUS, action);
             data.put(Constants.UPDATED_ON, DiscussionServiceUtil.getFormattedCurrentTime(new Timestamp(System.currentTimeMillis())));
             data.put(Constants.UPDATED_BY, userId);
 
