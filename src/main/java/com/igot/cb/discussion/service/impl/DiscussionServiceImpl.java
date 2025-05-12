@@ -161,7 +161,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             communityObject.put(Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText());
             communityObject.put(Constants.STATUS, Constants.INCREMENT);
             communityObject.put(Constants.TYPE, Constants.POST);
-            //producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
+            producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -460,7 +460,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         updateCacheForFirstFivePages((String) map.get(Constants.COMMUNITY_ID), false);
                         updateCacheForGlobalFeed(userId);
                         log.info("Updated cache for global feed");
-                        //producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
+                        producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
                         return response;
                     } else {
                         log.info("Discussion is already inactive.");
@@ -551,7 +551,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                     communityObject.put(Constants.COMMUNITY_ID, dataNode.get(Constants.COMMUNITY_ID).asText());
                     communityObject.put(Constants.STATUS, Constants.INCREMENT);
                     communityObject.put(Constants.DISCUSSION_ID, discussionId);
-                    //producer.push(cbServerProperties.getCommunityLikeCount(), communityObject);
+                    producer.push(cbServerProperties.getCommunityLikeCount(), communityObject);
                 } else {
                     DiscussionServiceUtil.createErrorResponse(response, Constants.USER_MUST_VOTE_FIRST, HttpStatus.BAD_REQUEST, Constants.FAILED);
                     return response;
@@ -579,7 +579,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 communityObject.put(Constants.COMMUNITY_ID, dataNode.get(Constants.COMMUNITY_ID).asText());
                 communityObject.put(Constants.DISCUSSION_ID, discussionId);
                 communityObject.put(Constants.STATUS, Constants.UP.equals(voteType) ? Constants.INCREMENT : Constants.DECREMENT);
-                //producer.push(cbServerProperties.getCommunityLikeCount(), communityObject);
+                producer.push(cbServerProperties.getCommunityLikeCount(), communityObject);
             }
 
             discussionData.put(Constants.UP_VOTE_COUNT, currentVote ? existingUpVoteCount + 1 : existingUpVoteCount - 1);
@@ -794,7 +794,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             communityObject.put(Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText());
             communityObject.put(Constants.STATUS, Constants.INCREMENT);
             communityObject.put(Constants.TYPE, Constants.ANSWER_POST);
-            //producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
+            producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
 
             log.info("AnswerPost created successfully");
             map.put(Constants.CREATED_ON, currentTime);
