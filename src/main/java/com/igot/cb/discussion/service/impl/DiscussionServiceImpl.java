@@ -1614,39 +1614,93 @@ public class DiscussionServiceImpl implements DiscussionService {
 
     private String generateRedisTokenKey(SearchCriteria searchCriteria) {
         if (searchCriteria != null) {
-            if (searchCriteria.getFilterCriteriaMap().size() == 3
-                    && searchCriteria.getFilterCriteriaMap().get(Constants.TYPE) instanceof String
-                    && Constants.QUESTION.equals(searchCriteria.getFilterCriteriaMap().get(Constants.TYPE))
-                    && searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY) instanceof String
-                    && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
-                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY))
-                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID))
-                    && searchCriteria.getRequestedFields() != null
-                    && CollectionUtils.isEmpty(searchCriteria.getRequestedFields())) {
-
-                return Constants.DISCUSSION_POSTS_BY_USER
-                        + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
-                        + Constants.UNDER_SCORE
-                        + searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY)
-                        + Constants.UNDER_SCORE
-                        + searchCriteria.getPageNumber();
-            }
-
-            if (searchCriteria.getFilterCriteriaMap() != null
-                    && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
-                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID))
-                    && searchCriteria.getFilterCriteriaMap().get(Constants.TYPE) instanceof String
-                    && Constants.QUESTION.equals(searchCriteria.getFilterCriteriaMap().get(Constants.TYPE))
-                    && searchCriteria.getFilterCriteriaMap().get(Constants.CATEGORY_TYPE) instanceof List
-                    && ((List<?>) searchCriteria.getFilterCriteriaMap().get(Constants.CATEGORY_TYPE)).size() == 1
-                    && Constants.DOCUMENT.equals(((List<?>) searchCriteria.getFilterCriteriaMap().get(Constants.CATEGORY_TYPE)).get(0))
-                    && searchCriteria.getRequestedFields() != null && CollectionUtils.isEmpty(searchCriteria.getRequestedFields())) {
-                return Constants.DISCUSSION_DOCUMENT_POST + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
-                        + Constants.UNDER_SCORE
-                        + searchCriteria.getPageNumber();
-            }
 
             try {
+                if (searchCriteria.getFilterCriteriaMap() != null
+                        && searchCriteria.getFilterCriteriaMap().size() == cbServerProperties.getUserFeedFilterCriteriaMapSize()
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.CREATED_BY)
+                        && searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY) instanceof String
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
+                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
+
+                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getFilterCriteriaQuestionUserFeed(), SearchCriteria.class);
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.CREATED_BY, searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY));
+                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
+
+                    if (tempSearchCriteria.equals(searchCriteria)) {
+                        return Constants.DISCUSSION_POSTS_BY_USER
+                                + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
+                                + Constants.UNDER_SCORE
+                                + searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY)
+                                + Constants.UNDER_SCORE
+                                + searchCriteria.getPageNumber();
+                    }
+                }
+                if (searchCriteria.getFilterCriteriaMap() != null
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
+                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.CATEGORY_TYPE)) {
+                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getFilterCriteriaQuestionDocumentFeed(), SearchCriteria.class);
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
+                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
+                    if (tempSearchCriteria.equals(searchCriteria)) {
+                        return Constants.DISCUSSION_DOCUMENT_POST + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
+                                + Constants.UNDER_SCORE
+                                + searchCriteria.getPageNumber();
+                    }
+                }
+                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
+                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
+                        && searchCriteria.getFilterCriteriaMap().get(Constants.STATUS) instanceof List) {
+                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAllReportFeed(), SearchCriteria.class);
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
+                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
+                    if (tempSearchCriteria.equals(searchCriteria)) {
+                        return Constants.ALL_REPORTED_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
+                    }
+                }
+                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID) && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
+                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoQuestionReportFeed(), SearchCriteria.class);
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
+                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
+                    if (tempSearchCriteria.equals(searchCriteria)) {
+                        return Constants.REPORTED_QUESTION_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
+                    }
+                }
+
+                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
+                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
+                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAnswerPostReportFeed(), SearchCriteria.class);
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
+                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
+                    if (tempSearchCriteria.equals(searchCriteria)) {
+                        return Constants.REPORTED_ANSWER_POST_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
+                    }
+                }
+
+                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID) && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
+                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAnswerPostReplyReportFeed(), SearchCriteria.class);
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
+                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
+                    if (tempSearchCriteria.equals(searchCriteria)) {
+                        return Constants.REPORTED_ANSWER_POST_REPLY_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
+                    }
+                }
+
+                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
+                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID) && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
+                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAllSuspendedFeed(), SearchCriteria.class);
+                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
+                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
+                    if (tempSearchCriteria.equals(searchCriteria)) {
+                        return Constants.SUSPENDED_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
+                    }
+                }
+
                 String reqJsonString = objectMapper.writeValueAsString(searchCriteria);
                 return JWT.create().withClaim(Constants.REQUEST_PAYLOAD, reqJsonString).sign(Algorithm.HMAC256(Constants.JWT_SECRET_KEY));
             } catch (JsonProcessingException e) {
