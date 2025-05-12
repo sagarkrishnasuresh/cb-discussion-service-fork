@@ -1,6 +1,6 @@
 package com.igot.cb.discussion.service.impl;
 
-import com.datastax.driver.core.utils.UUIDs;
+import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,7 +105,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             DiscussionAnswerPostReplyEntity jsonNodeEntity = new DiscussionAnswerPostReplyEntity();
 
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            UUID id = UUIDs.timeBased();
+            UUID id = Uuids.timeBased();
             answerPostReplyDataNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
@@ -121,7 +121,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(answerPostReplyDataNode);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + id, jsonNode);
             updateAnswerPostReplyToAnswerPost(discussionEntity, String.valueOf(id), Constants.INCREMENT);
             redisTemplate.opsForValue()
@@ -188,7 +188,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) savedEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-        esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+        esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
     }
 
@@ -282,7 +282,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             map.put(Constants.IS_ACTIVE, false);
             DiscussionEntity discussionEntity = discussionRepository.findById(data.get(Constants.PARENT_ANSWER_POST_ID).asText()).orElse(null);
             updateAnswerPostReplyToAnswerPost(discussionEntity, discussionId, Constants.DECREMENT);
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, data);
             log.info("AnswerPostReply details deleted successfully");
             response.setResponseCode(HttpStatus.OK);
@@ -342,7 +342,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(data);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionAnswerPostReplyEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionAnswerPostReplyEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionAnswerPostReplyEntity.getDiscussionId(), jsonNode);
             redisTemplate.opsForValue()
                     .getAndDelete(DiscussionServiceUtil.generateRedisJwtTokenKey(createDefaultSearchCriteria(
@@ -466,7 +466,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             ObjectNode jsonNode = objectMapper.createObjectNode().setAll(data);
             Map<String, Object> esMap = objectMapper.convertValue(jsonNode, Map.class);
             esUtilService.updateDocument(
-                    cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId,
+                    cbServerProperties.getDiscussionEntity(), discussionId,
                     esMap, cbServerProperties.getElasticDiscussionJsonPath()
             );
 
@@ -487,8 +487,9 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             }
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
         } catch (Exception e) {
-            log.error("Failed to manage post: {}", e.getMessage(), e);
+            log.error("Failed to suspend post: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
+            return response;
         }
         return response;
     }
@@ -650,7 +651,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                     discussionEntity.setData(data);
                     discussionRepository.save(discussionEntity);
                     Map<String, Object> map = objectMapper.convertValue(data, Map.class);
-                    esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+                    esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
                 }
             }
             response.setResponseCode(HttpStatus.OK);
