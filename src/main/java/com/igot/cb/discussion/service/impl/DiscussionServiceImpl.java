@@ -2,7 +2,7 @@ package com.igot.cb.discussion.service.impl;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.datastax.driver.core.utils.UUIDs;
+import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,7 +30,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -131,7 +130,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
 
-            UUID id = UUIDs.timeBased();
+            UUID id = Uuids.timeBased();
             discussionDetailsNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
@@ -151,7 +150,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, saveJsonEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), saveJsonEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + saveJsonEntity.getDiscussionId(), jsonNode);
             deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + discussionDetails.get(Constants.COMMUNITY_ID).asText());
             deleteCacheByCommunity(Constants.DISCUSSION_POSTS_BY_USER + discussionDetails.get(Constants.COMMUNITY_ID).asText() + Constants.UNDER_SCORE + userId);
@@ -294,7 +293,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNode.setAll(data);
 
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), jsonNode);
             deleteCacheByCommunity(Constants.DISCUSSION_POSTS_BY_USER + data.get(Constants.COMMUNITY_ID).asText() + Constants.UNDER_SCORE + userId);
             if (data.has(Constants.CATEGORY_TYPE)
@@ -431,7 +430,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                         discussionRepository.save(jasonEntity);
                         Map<String, Object> map = objectMapper.convertValue(data, Map.class);
                         map.put(Constants.IS_ACTIVE, false);
-                        esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+                        esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
                         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, data);
                         log.info("Discussion details deleted successfully");
                         response.setResponseCode(HttpStatus.OK);
@@ -596,7 +595,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 discussionRepository.save(discussionEntity);
             }
 
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, discussionData, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionId, discussionData, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, discussionData);
 
             if (!isAnswerReply) {
@@ -760,7 +759,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             DiscussionEntity jsonNodeEntity = new DiscussionEntity();
 
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            UUID id = UUIDs.timeBased();
+            UUID id = Uuids.timeBased();
             answerPostDataNode.put(Constants.DISCUSSION_ID, String.valueOf(id));
             jsonNodeEntity.setDiscussionId(String.valueOf(id));
             jsonNodeEntity.setCreatedOn(currentTime);
@@ -778,7 +777,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(answerPostDataNode);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
 
             updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id), Constants.INCREMENT);
@@ -864,7 +863,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         jsonNode.setAll((ObjectNode) savedEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
 
-        esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+        esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
     }
 
@@ -1000,7 +999,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             jsonNode.setAll(data);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionId, map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
 
             if (Constants.ANSWER_POST_REPLY.equals(type)) {
@@ -1179,7 +1178,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(data);
             Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), Constants.INDEX_TYPE, discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(discussionEntity.getDiscussionId()), jsonNode);
             redisTemplate.opsForValue()
                     .getAndDelete(DiscussionServiceUtil.generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
@@ -1504,18 +1503,6 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
     }
 
-    private static Map<String, Object> getMustNotMap(String userId) {
-        Map<String, Object> mustNotMap = new HashMap<>();
-        List<Map<String, Object>> mustNotList = new ArrayList<>();
-        Map<String, Object> reportedByMatch = new HashMap<>();
-        reportedByMatch.put(Constants.REPORTED_BY, userId);
-        Map<String, Object> reportedByCondition = new HashMap<>();
-        reportedByCondition.put(Constants.MATCH, reportedByMatch);
-        mustNotList.add(reportedByCondition);
-        mustNotMap.put(Constants.MUST_NOT, mustNotList);
-        return mustNotMap;
-    }
-
     private SearchCriteria getCriteria(int pageNumber, int pageSize) {
         SearchCriteria searchCriteria = new SearchCriteria();
         searchCriteria.setPageNumber(pageNumber);
@@ -1614,93 +1601,39 @@ public class DiscussionServiceImpl implements DiscussionService {
 
     private String generateRedisTokenKey(SearchCriteria searchCriteria) {
         if (searchCriteria != null) {
+            if (searchCriteria.getFilterCriteriaMap().size() == 3
+                    && searchCriteria.getFilterCriteriaMap().get(Constants.TYPE) instanceof String
+                    && Constants.QUESTION.equals(searchCriteria.getFilterCriteriaMap().get(Constants.TYPE))
+                    && searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY) instanceof String
+                    && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
+                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY))
+                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID))
+                    && searchCriteria.getRequestedFields() != null
+                    && CollectionUtils.isEmpty(searchCriteria.getRequestedFields())) {
+
+                return Constants.DISCUSSION_POSTS_BY_USER
+                        + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
+                        + Constants.UNDER_SCORE
+                        + searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY)
+                        + Constants.UNDER_SCORE
+                        + searchCriteria.getPageNumber();
+            }
+
+            if (searchCriteria.getFilterCriteriaMap() != null
+                    && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
+                    && StringUtils.isNotBlank((String) searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID))
+                    && searchCriteria.getFilterCriteriaMap().get(Constants.TYPE) instanceof String
+                    && Constants.QUESTION.equals(searchCriteria.getFilterCriteriaMap().get(Constants.TYPE))
+                    && searchCriteria.getFilterCriteriaMap().get(Constants.CATEGORY_TYPE) instanceof List
+                    && ((List<?>) searchCriteria.getFilterCriteriaMap().get(Constants.CATEGORY_TYPE)).size() == 1
+                    && Constants.DOCUMENT.equals(((List<?>) searchCriteria.getFilterCriteriaMap().get(Constants.CATEGORY_TYPE)).get(0))
+                    && searchCriteria.getRequestedFields() != null && CollectionUtils.isEmpty(searchCriteria.getRequestedFields())) {
+                return Constants.DISCUSSION_DOCUMENT_POST + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
+                        + Constants.UNDER_SCORE
+                        + searchCriteria.getPageNumber();
+            }
 
             try {
-                if (searchCriteria.getFilterCriteriaMap() != null
-                        && searchCriteria.getFilterCriteriaMap().size() == cbServerProperties.getUserFeedFilterCriteriaMapSize()
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.CREATED_BY)
-                        && searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY) instanceof String
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
-                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
-
-                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getFilterCriteriaQuestionUserFeed(), SearchCriteria.class);
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.CREATED_BY, searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY));
-                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
-
-                    if (tempSearchCriteria.equals(searchCriteria)) {
-                        return Constants.DISCUSSION_POSTS_BY_USER
-                                + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
-                                + Constants.UNDER_SCORE
-                                + searchCriteria.getFilterCriteriaMap().get(Constants.CREATED_BY)
-                                + Constants.UNDER_SCORE
-                                + searchCriteria.getPageNumber();
-                    }
-                }
-                if (searchCriteria.getFilterCriteriaMap() != null
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
-                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.CATEGORY_TYPE)) {
-                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getFilterCriteriaQuestionDocumentFeed(), SearchCriteria.class);
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
-                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
-                    if (tempSearchCriteria.equals(searchCriteria)) {
-                        return Constants.DISCUSSION_DOCUMENT_POST + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID)
-                                + Constants.UNDER_SCORE
-                                + searchCriteria.getPageNumber();
-                    }
-                }
-                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
-                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String
-                        && searchCriteria.getFilterCriteriaMap().get(Constants.STATUS) instanceof List) {
-                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAllReportFeed(), SearchCriteria.class);
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
-                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
-                    if (tempSearchCriteria.equals(searchCriteria)) {
-                        return Constants.ALL_REPORTED_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
-                    }
-                }
-                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID) && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
-                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoQuestionReportFeed(), SearchCriteria.class);
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
-                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
-                    if (tempSearchCriteria.equals(searchCriteria)) {
-                        return Constants.REPORTED_QUESTION_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
-                    }
-                }
-
-                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID)
-                        && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
-                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAnswerPostReportFeed(), SearchCriteria.class);
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
-                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
-                    if (tempSearchCriteria.equals(searchCriteria)) {
-                        return Constants.REPORTED_ANSWER_POST_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
-                    }
-                }
-
-                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID) && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
-                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAnswerPostReplyReportFeed(), SearchCriteria.class);
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
-                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
-                    if (tempSearchCriteria.equals(searchCriteria)) {
-                        return Constants.REPORTED_ANSWER_POST_REPLY_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
-                    }
-                }
-
-                if (searchCriteria.getFilterCriteriaMap() != null && searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS)
-                        && searchCriteria.getFilterCriteriaMap().containsKey(Constants.COMMUNITY_ID) && searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) instanceof String) {
-                    SearchCriteria tempSearchCriteria = objectMapper.readValue(cbServerProperties.getMdoAllSuspendedFeed(), SearchCriteria.class);
-                    tempSearchCriteria.getFilterCriteriaMap().put(Constants.COMMUNITY_ID, searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID));
-                    tempSearchCriteria.setPageNumber(searchCriteria.getPageNumber());
-                    if (tempSearchCriteria.equals(searchCriteria)) {
-                        return Constants.SUSPENDED_POSTS_CACHE_PREFIX + searchCriteria.getFilterCriteriaMap().get(Constants.COMMUNITY_ID) + Constants.UNDER_SCORE + searchCriteria.getPageNumber();
-                    }
-                }
-
                 String reqJsonString = objectMapper.writeValueAsString(searchCriteria);
                 return JWT.create().withClaim(Constants.REQUEST_PAYLOAD, reqJsonString).sign(Algorithm.HMAC256(Constants.JWT_SECRET_KEY));
             } catch (JsonProcessingException e) {
