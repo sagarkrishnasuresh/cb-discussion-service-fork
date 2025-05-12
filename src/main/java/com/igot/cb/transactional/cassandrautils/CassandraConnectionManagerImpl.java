@@ -1,151 +1,102 @@
 package com.igot.cb.transactional.cassandrautils;
 
-import com.datastax.oss.driver.api.core.ConsistencyLevel;
-import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
-import com.datastax.oss.driver.api.core.ProtocolVersion;
-import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
-import com.datastax.oss.driver.api.core.metadata.Metadata;
-import com.datastax.oss.driver.api.core.metadata.Node;
-import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
+import com.datastax.driver.core.*;
+import com.datastax.driver.core.policies.DefaultRetryPolicy;
 import com.igot.cb.pores.exceptions.CustomException;
 import com.igot.cb.pores.util.Constants;
 import com.igot.cb.pores.util.PropertiesCache;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import java.util.stream.Collectors;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
+
+import javax.annotation.PostConstruct;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
+ * @author Mahesh RV
  * @author Ruksana
  * <p>
  * Manages Cassandra connections and sessions.
  */
 @Component
 public class CassandraConnectionManagerImpl implements CassandraConnectionManager {
-    private static final Logger logger = LoggerFactory.getLogger(CassandraConnectionManagerImpl.class);
-    private static final Map<String, CqlSession> cassandraSessionMap = new ConcurrentHashMap<>(2);
-    private static CqlSession session;
+    private final Logger logger = LogManager.getLogger(getClass());
+    private final Map<String, Session> cassandraSessionMap = new ConcurrentHashMap<>(2);
+    private Cluster cluster;
 
     /**
      * Method invoked after bean creation for initialization
      */
-    public CassandraConnectionManagerImpl() {
-        // Initialize the connection and register shutdown hook
+    @PostConstruct
+    private void initialize() {
+        logger.info("Initializing CassandraConnectionManager...");
         registerShutdownHook();
         createCassandraConnection();
+        initializeSessions();
+        logger.info("CassandraConnectionManager initialized.");
     }
 
     /**
      * Retrieves a session for the specified keyspace.
      * If a session for the keyspace already exists, returns it; otherwise, creates a new session.
      *
-     * @param keyspaceName The keyspace for which to retrieve the session.
+     * @param keyspace The keyspace for which to retrieve the session.
      * @return The session object for the specified keyspace.
      */
-    @Override
-    public CqlSession getSession(String keyspaceName) {
-        // Check if session for keyspace already exists
-        CqlSession currentSession = cassandraSessionMap.get(keyspaceName);
-        if (currentSession != null&& !currentSession.isClosed()) {
-            return currentSession;
-        } else {
-            // Create new session scoped to keyspace using the USE command
-            CqlSession newSession = createCassandraConnectionWithKeySpaces(keyspaceName);
-            cassandraSessionMap.put(keyspaceName, newSession);
-            return newSession;
-        }
+    public Session getSession(String keyspace) {
+        return cassandraSessionMap.computeIfAbsent(keyspace, k -> cluster.connect(keyspace));
     }
 
     /**
      * Creates a Cassandra connection based on properties
      */
-    private CqlSession createCassandraConnectionWithKeySpaces(String keySpaceName) {
+    private void createCassandraConnection() {
         try {
-            // Load the properties required for connection
             PropertiesCache cache = PropertiesCache.getInstance();
-            String cassandraHost = cache.getProperty(Constants.CASSANDRA_CONFIG_HOST);
-            if (StringUtils.isBlank(cassandraHost)) {
-                throw new CustomException(
-                        Constants.ERROR,
-                        "Cassandra host is not configured",
-                        HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-            List<String> hosts = Arrays.asList(cassandraHost.split(","));
-            List<InetSocketAddress> contactPoints = hosts.stream()
-                    .map(host -> new InetSocketAddress(host.trim(), 9042)) // Assuming default port 9042
-                    .collect(Collectors.toList());
-            List<String> contactPointsString = hosts.stream()
-                    .map(host -> host.trim() + ":9042") // Ensure proper host:port format
-                    .collect(Collectors.toList());
-            DriverConfigLoader loader = DriverConfigLoader.programmaticBuilder()
-                    .withStringList(DefaultDriverOption.CONTACT_POINTS, contactPointsString)
-                    .withString(DefaultDriverOption.REQUEST_CONSISTENCY, getConsistencyLevel().name())
-                    .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, "datacenter1")
-                    .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE,
-                            Integer.parseInt(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_LOCAL)))
-                    .withInt(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE,
-                            Integer.parseInt(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_REMOTE)))
-                    .withInt(DefaultDriverOption.HEARTBEAT_INTERVAL,
-                            Integer.parseInt(cache.getProperty(Constants.HEARTBEAT_INTERVAL)))
-                    .withInt(DefaultDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, 10000)
-                    .withInt(DefaultDriverOption.REQUEST_TIMEOUT, 10000)
-                    .withString(DefaultDriverOption.PROTOCOL_VERSION, ProtocolVersion.V4.toString())
-                    .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy.class)
-                    .withClass(DefaultDriverOption.TIMESTAMP_GENERATOR_CLASS, AtomicTimestampGenerator.class)
-                    .build();
-            CqlSession sessionWithKeyspaces;
-            if (StringUtils.isNotBlank(keySpaceName)) {
-                sessionWithKeyspaces = CqlSession.builder()
-                        .addContactPoints(contactPoints)
-                        .withLocalDatacenter("datacenter1")
-                        .withKeyspace(keySpaceName)
-                        .withConfigLoader(loader)
-                        .build();
-            } else {
-                sessionWithKeyspaces = CqlSession.builder()
-                        .addContactPoints(contactPoints)
-                        .withLocalDatacenter("datacenter1")
-                        .withConfigLoader(loader)
-                        .build();
-            }
-            logger.info("Connected to the keyspaces: " + keySpaceName);
-            // Get metadata and log cluster information
-            final Metadata metadata = sessionWithKeyspaces.getMetadata();
-            logger.info(String.format("Connected to cluster: %s", metadata.getClusterName()));
-            // Log nodes in the cluster
-            for (Node host : metadata.getNodes().values()) {
-                logger.info(String.format("Datacenter: %s; Host: %s; Rack: %s", host.getDatacenter(), host.getEndPoint(), host.getRack()));
-            }
-            return sessionWithKeyspaces;
+            PoolingOptions poolingOptions = new PoolingOptions();
+            poolingOptions.setCoreConnectionsPerHost(HostDistance.LOCAL, Integer.parseInt(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_LOCAL)));
+            poolingOptions.setMaxConnectionsPerHost(HostDistance.LOCAL, Integer.parseInt(cache.getProperty(Constants.MAX_CONNECTIONS_PER_HOST_FOR_LOCAL)));
+            poolingOptions.setCoreConnectionsPerHost(HostDistance.REMOTE, Integer.parseInt(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_REMOTE)));
+            poolingOptions.setMaxConnectionsPerHost(HostDistance.REMOTE, Integer.parseInt(cache.getProperty(Constants.MAX_CONNECTIONS_PER_HOST_FOR_REMOTE)));
+            poolingOptions.setMaxRequestsPerConnection(HostDistance.LOCAL, Integer.parseInt(cache.getProperty(Constants.MAX_REQUEST_PER_CONNECTION)));
+            poolingOptions.setHeartbeatIntervalSeconds(Integer.parseInt(cache.getProperty(Constants.HEARTBEAT_INTERVAL)));
+            poolingOptions.setPoolTimeoutMillis(Integer.parseInt(cache.getProperty(Constants.POOL_TIMEOUT)));
+            String[] hosts = StringUtils.split(cache.getProperty(Constants.CASSANDRA_CONFIG_HOST), ",");
+            cluster = createCluster(hosts, poolingOptions);
+            logClusterDetails(cluster);
         } catch (Exception e) {
-            logger.error("Error while creating Cassandra connection", e);
-            throw new CustomException(
-                    Constants.ERROR,
-                    e.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
+            logger.error("Error creating Cassandra connection", e);
+            throw new CustomException("Internal Server Error", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    private void createCassandraConnection() {
-        try {
-            session = createCassandraConnectionWithKeySpaces(null);
-        } catch (Exception e) {
-            logger.error("Error while creating Cassandra connection", e);
-            throw new CustomException(
-                    Constants.ERROR,
-                    e.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
+    /**
+     * Creates a Cluster object with specified hosts and pooling options
+     *
+     * @param hosts          - Cassandra host configuration
+     * @param poolingOptions -   // Configure connection pooling options
+     * @return - Cluster object with specified hosts and pooling options
+     */
+    private static Cluster createCluster(String[] hosts, PoolingOptions poolingOptions) {
+        Cluster.Builder builder = Cluster.builder()
+                .addContactPoints(hosts)
+                .withProtocolVersion(ProtocolVersion.V3)
+                .withRetryPolicy(DefaultRetryPolicy.INSTANCE)
+                .withTimestampGenerator(new AtomicMonotonicTimestampGenerator())
+                .withPoolingOptions(poolingOptions);
+
+        ConsistencyLevel consistencyLevel = getConsistencyLevel();
+        if (consistencyLevel != null) {
+            builder.withQueryOptions(new QueryOptions().setConsistencyLevel(consistencyLevel));
         }
+
+        return builder.build();
     }
 
     /**
@@ -155,48 +106,51 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
      */
     private static ConsistencyLevel getConsistencyLevel() {
         String consistency = PropertiesCache.getInstance().readProperty(Constants.SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL);
-        logger.info("CassandraConnectionManagerImpl:getConsistencyLevel: level = " + consistency);
         if (StringUtils.isBlank(consistency)) return null;
 
         try {
-            return DefaultConsistencyLevel.valueOf(consistency.toUpperCase());
+            return ConsistencyLevel.valueOf(consistency.toUpperCase());
         } catch (IllegalArgumentException exception) {
-            logger.info("CassandraConnectionManagerImpl:getConsistencyLevel: Exception occurred with error message = "
-                    + exception.getMessage());
+            LogManager.getLogger(CassandraConnectionManagerImpl.class)
+                    .info("Exception occurred with error message = {}", exception.getMessage());
         }
         return null;
     }
 
-
+    /**
+     * Initializes sessions for predefined keyspaces
+     */
+    private void initializeSessions() {
+        List<String> keyspacesList = Collections.singletonList(Constants.KEYSPACE_SUNBIRD);
+        for (String keyspace : keyspacesList) {
+            getSession(keyspace);
+        }
+    }
 
     /**
      * Registers a shutdown hook to clean-up resources
      */
-    public static void registerShutdownHook() {
-        Runtime runtime = Runtime.getRuntime();
-        runtime.addShutdownHook(new ResourceCleanUp());
-        logger.info("Cassandra ShutDownHook registered.");
+    private void registerShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(new Thread(this::cleanupResources));
+        logger.info("Cassandra shutdown hook registered.");
     }
 
     /**
      * Cleans up Cassandra resources during shutdown
      */
-    static class ResourceCleanUp extends Thread {
-        @Override
-        public void run() {
-            try {
-                logger.info("Started resource cleanup for Cassandra.");
-                for (Map.Entry<String, CqlSession> entry : cassandraSessionMap.entrySet()) {
-                    entry.getValue().close();
-                }
-                if (session != null) {
-                    session.close();
-                }
-                logger.info("Completed resource cleanup for Cassandra.");
-            } catch (Exception ex) {
-                logger.error("Error during resource cleanup", ex);
-            }
+    private void cleanupResources() {
+        logger.info("Starting resource cleanup for Cassandra...");
+        cassandraSessionMap.values().forEach(Session::close);
+        if (cluster != null) {
+            cluster.close();
         }
+        logger.info("Resource cleanup for Cassandra completed.");
     }
 
+    private void logClusterDetails(Cluster cluster) {
+        final Metadata metadata = cluster.getMetadata();
+        logger.info("Connected to cluster: {}", metadata.getClusterName());
+        metadata.getAllHosts().forEach(host ->
+                logger.info("Datacenter: {}; Host: {}; Rack: {}", host.getDatacenter(), host.getAddress(), host.getRack()));
+    }
 }

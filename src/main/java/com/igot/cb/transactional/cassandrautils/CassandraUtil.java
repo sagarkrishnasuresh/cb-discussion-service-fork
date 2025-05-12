@@ -1,11 +1,12 @@
 package com.igot.cb.transactional.cassandrautils;
 
-import com.datastax.oss.driver.api.core.cql.ResultSet;
-import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.driver.core.ColumnDefinitions;
+import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.Row;
 import com.igot.cb.pores.util.Constants;
 
-
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author Mahesh RV
@@ -40,31 +41,40 @@ public final class CassandraUtil {
     public static List<Map<String, Object>> createResponse(ResultSet results) {
         List<Map<String, Object>> responseList = new ArrayList<>();
         Map<String, String> columnsMapping = fetchColumnsMapping(results);
-        for (Row row : results) {
-            Map<String, Object> rowMap = new HashMap<>();
-            columnsMapping.forEach((key, value) -> rowMap.put(key, row.getObject(value)));
-            responseList.add(rowMap);
-        }
+        Iterator<Row> rowIterator = results.iterator();
+        rowIterator.forEachRemaining(
+                row -> {
+                    Map<String, Object> rowMap = new HashMap<>();
+                    columnsMapping
+                            .forEach((key, value) -> rowMap.put(key, row.getObject(value)));
+                    responseList.add(rowMap);
+                });
         return responseList;
     }
 
     public static Map<String, Object> createResponse(ResultSet results, String key) {
         Map<String, Object> responseList = new HashMap<>();
         Map<String, String> columnsMapping = fetchColumnsMapping(results);
-        for (Row row : results) {
-            Map<String, Object> rowMap = new HashMap<>();
-            columnsMapping.forEach((key1, value) -> rowMap.put(key1, row.getObject(value)));
-            responseList.put((String) rowMap.get(key), rowMap);
-        }
+        Iterator<Row> rowIterator = results.iterator();
+        rowIterator.forEachRemaining(
+                row -> {
+                    Map<String, Object> rowMap = new HashMap<>();
+                    columnsMapping
+                            .forEach((key1, value) -> rowMap.put(key1, row.getObject(value)));
+
+                    responseList.put((String) rowMap.get(key), rowMap);
+                });
         return responseList;
     }
 
     public static Map<String, String> fetchColumnsMapping(ResultSet results) {
-        Map<String, String> columnsMapping = new HashMap<>();
-        results.getColumnDefinitions().forEach(column -> {
-            String property = propertiesCache.readProperty(column.getName().asInternal()).trim();
-            columnsMapping.put(property, column.getName().asInternal());
-        });
-        return columnsMapping;
+        return results
+                .getColumnDefinitions()
+                .asList()
+                .stream()
+                .collect(
+                        Collectors.toMap(
+                                d -> propertiesCache.readProperty(d.getName()).trim(),
+                                ColumnDefinitions.Definition::getName));
     }
 }

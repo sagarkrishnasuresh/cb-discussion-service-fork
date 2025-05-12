@@ -1,30 +1,33 @@
 package com.igot.cb.discussion.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import jakarta.persistence.Column;
+import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.hibernate.annotations.Type;
-import jakarta.persistence.*;
+import org.hibernate.annotations.TypeDef;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 import java.sql.Timestamp;
-import com.vladmihalcea.hibernate.type.json.JsonType;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "discussion")
-@JsonIgnoreProperties(ignoreUnknown = true)
+@TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
 @Entity
 public class DiscussionEntity {
 
     @Id
     private String discussionId;
 
-    @Type(JsonType.class)
+    @Type(type = "jsonb")
     @Column(columnDefinition = "jsonb")
     private JsonNode data;
 

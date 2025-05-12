@@ -40,6 +40,15 @@ public interface CassandraOperation {
     public Map<String,Object> updateRecord(
             String keyspaceName, String tableName, Map<String, Object> request);
 
+    /**
+     * Method to update the record on basis of composite primary key.
+     *
+     * @param keyspaceName     Keyspace name
+     * @param tableName        Table name
+     * @param updateAttributes Column map to be used in set clause of update query
+     * @param compositeKey     Column map for composite primary key
+     * @return Response consisting of update query status
+     */
     Map<String, Object> updateRecordByCompositeKey(String keyspaceName, String tableName, Map<String, Object> updateAttributes,
                                                    Map<String, Object> compositeKey);
 
