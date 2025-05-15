@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
+    @Qualifier(Constants.SEARCH_RESULT_REDIS_TEMPLATE)
     private RedisTemplate<String, SearchResult> redisTemplate;
 
     @Override
