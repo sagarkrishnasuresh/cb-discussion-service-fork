@@ -30,6 +30,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -67,6 +68,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private CbServerProperties cbServerProperties;
     @Autowired
+    @Qualifier(Constants.SEARCH_RESULT_REDIS_TEMPLATE)
     private RedisTemplate<String, SearchResult> redisTemplate;
     @Autowired
     private ObjectMapper objectMapper;
@@ -75,6 +77,7 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private AccessTokenValidator accessTokenValidator;
     @Autowired
+    @Qualifier(Constants.REDIS_OBJECT_TEMPLATE)
     private RedisTemplate<String, Object> redisTemp;
     @Autowired
     private CommunityEngagementRepository communityEngagementRepository;
