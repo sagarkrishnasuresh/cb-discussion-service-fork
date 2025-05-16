@@ -74,4 +74,11 @@ public class CacheService {
     }
     return resultList;
   }
+
+  public List<Object> hgetMulti(List<String> keys) {
+    List<Object> resultList = new ArrayList<>();
+    List<String> values = redisTemplate.opsForValue().multiGet(keys);
+    resultList.addAll(values);
+    return resultList;
+  }
 }
