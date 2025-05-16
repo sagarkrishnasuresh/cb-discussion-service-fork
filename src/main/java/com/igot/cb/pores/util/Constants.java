@@ -249,7 +249,6 @@ public class Constants {
     public static final String REDIS_DATA_TEMPLATE = "redisDataTemplate";
     public static final String SEARCH_RESULT_REDIS_TEMPLATE = "searchResultRedisTemplate";
     public static final String REDIS_CONNECTION_FACTORY = "redisConnectionFactory";
-    public static final String REDIS_OBJECT_TEMPLATE = "redisObjectTemplate";
     public static final String REDIS_DATA_CONNECTION_FACTORY = "redisDataConnectionFactory";
 
     private Constants() {

@@ -106,13 +106,4 @@ public class RedisConfig {
     poolConfig.setMaxWait(Duration.ofMillis(5000));
     return poolConfig;
   }
-
-  @Bean(name = Constants.REDIS_OBJECT_TEMPLATE)
-  public RedisTemplate<String, Object> redisObjectTemplate(RedisConnectionFactory redisConnectionFactory) {
-    RedisTemplate<String, Object> template = new RedisTemplate<>();
-    template.setConnectionFactory(redisConnectionFactory);
-    template.setKeySerializer(new StringRedisSerializer());
-    template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
-    return template;
-  }
 }

@@ -233,9 +233,9 @@ public class EsUtilServiceImpl implements EsUtilService {
                             mustNotQueries.add(Query.of(q ->q.termsSet(t->t.field(field).terms((ArrayList<String>) value))));
                         } else if (value instanceof Boolean) {
                             boolQueries.add(Query.of(q ->q.term(t->t.field(field).value((boolean)value))));
-                        } else if (value instanceof ArrayList) {
-                            List<FieldValue> termsList = ((ArrayList<String>) value).stream()
-                                    .map(FieldValue::of)
+                        } else if (value instanceof List<?>) {
+                            List<FieldValue> termsList = ((List<?>) value).stream()
+                                    .map(v -> FieldValue.of(v.toString()))
                                     .collect(Collectors.toList());
                             boolQueryBuilder.must(Query.of(q -> q.terms(t -> t.field(field + Constants.KEYWORD).terms(terms -> terms.value(termsList)))));
                         } else if (value instanceof String) {

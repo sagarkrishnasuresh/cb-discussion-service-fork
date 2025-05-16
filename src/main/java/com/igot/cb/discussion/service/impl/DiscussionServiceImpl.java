@@ -77,9 +77,6 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private AccessTokenValidator accessTokenValidator;
     @Autowired
-    @Qualifier(Constants.REDIS_OBJECT_TEMPLATE)
-    private RedisTemplate<String, Object> redisTemp;
-    @Autowired
     private CommunityEngagementRepository communityEngagementRepository;
     @Autowired
     private Producer producer;
@@ -636,7 +633,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         if (isUserData) {
             values = cacheService.hget(keys);
         } else {
-            values = redisTemp.opsForValue().multiGet(keys);
+            values = cacheService.hgetMulti(keys);
         }
 
         // Create a map of key-value pairs, converting stringified JSON objects to User objects
