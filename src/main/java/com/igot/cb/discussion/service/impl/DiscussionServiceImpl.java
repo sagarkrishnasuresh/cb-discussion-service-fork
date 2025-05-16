@@ -1557,7 +1557,6 @@ public class DiscussionServiceImpl implements DiscussionService {
         filterCriteria.put(Constants.STATUS, Arrays.asList(Constants.ACTIVE, Constants.REPORTED));
         filterCriteria.put(Constants.IS_ACTIVE, true);
         searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
-        log.info("searchCriteria: {}", searchCriteria);
 
         try {
             SearchResult searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
