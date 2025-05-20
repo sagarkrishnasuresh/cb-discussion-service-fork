@@ -106,7 +106,7 @@ public class CassandraOperationImpl implements CassandraOperation {
         Select selectQuery = null;
         List<Map<String, Object>> response = new ArrayList<>();
         try {
-            selectQuery = processQuery(keyspaceName, tableName, propertyMap, fields);
+            selectQuery = processQueryWithFiltering(keyspaceName, tableName, propertyMap, fields);
             CqlSession session = connectionManager.getSession(keyspaceName);
             ResultSet results = session.execute(selectQuery.build());
             response = CassandraUtil.createResponse(results);
@@ -266,6 +266,36 @@ public class CassandraOperationImpl implements CassandraOperation {
                     Constants.EXCEPTION_MSG_DELETE, tableName, e.getMessage()));
             throw e;
         }
+    }
+
+    private Select processQueryWithFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap,
+                                             List<String> fields) {
+        Select select;
+        if (CollectionUtils.isNotEmpty(fields)) {
+            select = QueryBuilder.selectFrom(keyspaceName, tableName).columns(fields);
+        } else {
+            select = QueryBuilder.selectFrom(keyspaceName, tableName).all();
+        }
+        if (MapUtils.isEmpty(propertyMap)) {
+            return select.allowFiltering(); // Build and return the query
+        }
+        for (Map.Entry<String, Object> entry : propertyMap.entrySet()) {
+            String columnName = entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof List) {
+                List<?> valueList = (List<?>) value;
+                if (CollectionUtils.isNotEmpty(valueList)) {
+                    List<Term> terms = valueList.stream()
+                            .map(QueryBuilder::literal)
+                            .collect(Collectors.toList());
+                    select = select.whereColumn(columnName).in(terms);
+                }
+            } else {
+                select = select.whereColumn(columnName).isEqualTo(QueryBuilder.literal(value));
+            }
+        }
+        select.allowFiltering();
+        return select;
     }
 
 }
