@@ -28,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -445,7 +446,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                 propertyMap.put(Constants.DISCUSSION_ID, discussionId);
                 cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, propertyMap);
 
-                List<Map<String, Object>> reportUsers = cassandraOperation.getRecordsByPropertiesByKey(
+                List<Map<String, Object>> reportUsers = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
                         Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER,
                         propertyMap, Arrays.asList(Constants.USERID), null
                 );
@@ -631,7 +632,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
 
             for (Map<String, Object> record : reportedDiscussionIds) {
                 String discussionId = (String) record.get(Constants.DISCUSSION_ID_KEY);
-                Date createdOn = (Date) record.get(Constants.CREATED_ON_KEY);
+                Timestamp createdOn = Timestamp.from(((Instant) record.get(Constants.CREATED_ON_KEY)));
                 if (latestReportedTimeMap.containsKey(discussionId)) {
                     Date existingTime = latestReportedTimeMap.get(discussionId);
                     if (createdOn.after(existingTime)) {
