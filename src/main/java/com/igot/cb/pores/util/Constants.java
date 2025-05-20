@@ -14,7 +14,7 @@ public class Constants {
     public static final String HEARTBEAT_INTERVAL = "heartbeatIntervalSeconds";
     public static final String POOL_TIMEOUT = "poolTimeoutMillis";
     public static final String CASSANDRA_CONFIG_HOST = "cassandra.config.host";
-    public static final String SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL = "LOCAL_QUORUM";
+    public static final String SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL = "sunbird_cassandra_consistency_level";
     public static final String EXCEPTION_MSG_FETCH = "Exception occurred while fetching record from ";
     public static final String INSERT_INTO = "INSERT INTO ";
     public static final String DOT = ".";
@@ -244,6 +244,12 @@ public class Constants {
     public static final String REPORTED_ANSWER_POST_POSTS_CACHE_PREFIX = "mdoReportedAnswerPostPosts_";
     public static final String ALL_REPORTED_POSTS_CACHE_PREFIX = "mdoAllReportedPosts_";
     public static final String REPORTED_QUESTION_POSTS_CACHE_PREFIX = "mdoReportedQuestionPosts_";
+    public static final String ERROR = "ERROR";
+    public static final String DESCRIPTION = "description";
+    public static final String REDIS_DATA_TEMPLATE = "redisDataTemplate";
+    public static final String SEARCH_RESULT_REDIS_TEMPLATE = "searchResultRedisTemplate";
+    public static final String REDIS_CONNECTION_FACTORY = "redisConnectionFactory";
+    public static final String REDIS_DATA_CONNECTION_FACTORY = "redisDataConnectionFactory";
 
     private Constants() {
     }
