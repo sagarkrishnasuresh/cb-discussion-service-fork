@@ -43,6 +43,7 @@ import scala.Option;
 import javax.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -957,9 +958,10 @@ public class DiscussionServiceImpl implements DiscussionService {
                     userReportData.put(Constants.REASON, reasonBuilder.toString());
                 }
             }
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            Instant now = Instant.now();
+            Timestamp currentTime = Timestamp.from(now);
             data.put(Constants.RECENT_REPORTED_ON, getFormattedCurrentTime(currentTime));
-            userReportData.put(Constants.CREATED_ON,currentTime);
+            userReportData.put(Constants.CREATED_ON, now);
             cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER, userReportData);
             cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, userReportData);
 
@@ -968,7 +970,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             if (cbServerProperties.isDiscussionReportHidePost()) {
                 List<Map<String, Object>> reportedByUsers = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
                         Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, Collections.singletonMap(Constants.DISCUSSION_ID, discussionId), null, null);
-                status = CollectionUtils.isEmpty(reportedByUsers) || reportedByUsers.size() >= cbServerProperties.getReportPostUserLimit()
+                status = CollectionUtils.isNotEmpty(reportedByUsers) && reportedByUsers.size() >= cbServerProperties.getReportPostUserLimit()
                         ? Constants.SUSPENDED
                         : Constants.REPORTED;
             } else {
@@ -1242,7 +1244,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
 
             // Insert the new bookmark
-            properties.put(Constants.CREATED_ON, new Timestamp(System.currentTimeMillis()));
+            properties.put(Constants.CREATED_ON, Instant.now());
             properties.put(Constants.STATUS, true);
             cassandraOperation.insertRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_BOOKMARKS, properties);
             cacheService.deleteCache(Constants.DISCUSSION_CACHE_PREFIX + Constants.COMMUNITY + communityId + userId);

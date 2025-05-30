@@ -124,13 +124,13 @@ public class CassandraOperationImpl implements CassandraOperation {
         try {
             String query = CassandraUtil.getPreparedStatement(keyspaceName, tableName, request);
             CqlSession session = connectionManager.getSession(keyspaceName);
-            com.datastax.oss.driver.api.core.cql.PreparedStatement statement = session.prepare(query);
-            com.datastax.oss.driver.api.core.cql.BoundStatement boundStatement = statement.bind(request.values().toArray());
+            PreparedStatement statement = session.prepare(query);
+            BoundStatement boundStatement = statement.bind(request.values().toArray());
             session.execute(boundStatement);
             response.put(Constants.RESPONSE, Constants.SUCCESS);
         } catch (Exception e) {
             String errMsg = String.format("Exception occurred while inserting record to %s %s", tableName, e.getMessage());
-            logger.error("Error inserting record into {}: {}", tableName, e.getMessage());
+            logger.error("Error inserting record into {}: {}: {}", tableName, e.getMessage(), e);
             response.put(Constants.RESPONSE, Constants.FAILED);
             response.put(Constants.ERROR_MESSAGE, errMsg);
         }
