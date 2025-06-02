@@ -444,18 +444,20 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             if (Constants.ACTIVE.equals(action)) {
                 Map<String, Object> propertyMap = new HashMap<>();
                 propertyMap.put(Constants.DISCUSSION_ID, discussionId);
-                cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, propertyMap);
-
                 List<Map<String, Object>> reportUsers = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-                        Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER,
+                        Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST,
                         propertyMap, Arrays.asList(Constants.USERID), null
                 );
 
                 for (Map<String, Object> map : reportUsers) {
-                    propertyMap.put(Constants.USERID, map.get(Constants.USERID));
-                    cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER, propertyMap);
+                    Map<String, Object> keyMap = new HashMap<>();
+                    keyMap.put(Constants.DISCUSSION_ID, discussionId);
+                    keyMap.put(Constants.USERID, map.get(Constants.USERID));
+                    cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_USER, keyMap);
                     log.info("Deleted report record for user: {}, by admin: {}", map.get(Constants.USERID), userId);
                 }
+
+                cassandraOperation.deleteRecord(Constants.KEYSPACE_SUNBIRD, Constants.DISCUSSION_POST_REPORT_LOOKUP_BY_POST, propertyMap);
             }
 
             if (Constants.ANSWER_POST_REPLY.equals(type)) {
