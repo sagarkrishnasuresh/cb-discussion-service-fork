@@ -432,6 +432,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                     data.get(Constants.STATUS).asText().equals(Constants.ACTIVE) && action.equals(Constants.ACTIVE)) {
                 return ProjectUtil.returnErrorMsg(Constants.POST_ERROR_MSG + data.get(Constants.STATUS).asText() + ".", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             }
+            String status = data.get(Constants.STATUS).asText();
             if (Constants.SUSPEND.equals(action)) {
                 data.put(Constants.STATUS, Constants.SUSPENDED);
             } else if (Constants.ACTIVE.equals(action)) {
@@ -489,6 +490,9 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             }
             if (cachePrefixes.containsKey(type)) {
                 deleteCacheByPrefix(cachePrefixes.get(type) + communityId);
+            }
+            if (Constants.ACTIVE.equals(action) && Constants.SUSPENDED.equals(status)) {
+                deleteCacheByPrefix(cachePrefixes.get(Constants.SUSPEND) + communityId);
             }
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionId, jsonNode);
         } catch (Exception e) {
