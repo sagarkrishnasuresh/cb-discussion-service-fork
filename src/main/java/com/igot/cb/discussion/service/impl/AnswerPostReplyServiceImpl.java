@@ -12,6 +12,9 @@ import com.igot.cb.discussion.entity.DiscussionEntity;
 import com.igot.cb.discussion.repository.DiscussionAnswerPostReplyRepository;
 import com.igot.cb.discussion.repository.DiscussionRepository;
 import com.igot.cb.discussion.service.AnswerPostReplyService;
+import com.igot.cb.discussion.service.DiscussionService;
+import com.igot.cb.notificationUtill.HelperMethodService;
+import com.igot.cb.notificationUtill.NotificationTriggerService;
 import com.igot.cb.pores.cache.CacheService;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.elasticsearch.dto.SearchResult;
@@ -33,11 +36,14 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
+
+import static com.igot.cb.pores.util.Constants.REPLIED_COMMENT;
+import static com.igot.cb.pores.util.Constants.TITLE;
 
 @Service
 @Slf4j
 public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
+
 
     @Autowired
     private PayloadValidation payloadValidation;
@@ -57,6 +63,10 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
     private CassandraOperation cassandraOperation;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private NotificationTriggerService notificationTriggerService;
+    @Autowired
+    private HelperMethodService helperMethodService;
     @Autowired
     @Qualifier(Constants.SEARCH_RESULT_REDIS_TEMPLATE)
     private RedisTemplate<String, SearchResult> redisTemplate;
@@ -141,6 +151,15 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
+
+                Map<String, Object> notificationData = Map.of(
+                        Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
+                        Constants.DISCUSSION_ID, String.valueOf(id)
+                );
+
+                String firstName = helperMethodService.fetchUserFirstName(userId);
+                notificationTriggerService.triggerNotification(REPLIED_COMMENT, List.of(userId), TITLE, firstName, notificationData);
+
         } catch (Exception e) {
             log.error("Failed to create AnswerPost: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_ANSWER_POST_REPLY, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -689,4 +708,5 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             log.info("No cache keys found for pattern: {}", pattern);
         }
     }
+
 }

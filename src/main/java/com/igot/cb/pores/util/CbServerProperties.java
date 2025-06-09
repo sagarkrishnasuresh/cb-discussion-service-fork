@@ -91,4 +91,7 @@ public class CbServerProperties {
   @Value("${user.feed.filter.criteriaMapSize}")
   private int userFeedFilterCriteriaMapSize;
 
+  @Value("${kafka.topic.user.post.count}")
+  private String kafkaUserPostCount;
+
 }

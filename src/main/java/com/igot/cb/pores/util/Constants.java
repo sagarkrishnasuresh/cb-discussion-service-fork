@@ -250,6 +250,17 @@ public class Constants {
     public static final String SEARCH_RESULT_REDIS_TEMPLATE = "searchResultRedisTemplate";
     public static final String REDIS_CONNECTION_FACTORY = "redisConnectionFactory";
     public static final String REDIS_DATA_CONNECTION_FACTORY = "redisDataConnectionFactory";
+    public static final String LIKED_POST = "LIKED_POST";
+    public static final String LIKED_COMMENT = "LIKED_COMMENT";
+    public static final String REPLIED_POST = "REPLIED_POST";
+    public static final String TITLE = "title";
+    public static final String REPLIED_COMMENT = "REPLIED_COMMENT";
+    public static final String USER_NAME = "userName";
+    public static final String PLACE_HOLDERS ="placeholders";
+    public static final String DATA = "data";
+    public static final String SUB_CATEGORY = "subCategory";
+    public static final String USER_IDS = "userIds";
+    public static final String MESSAGE = "message";
 
     private Constants() {
     }

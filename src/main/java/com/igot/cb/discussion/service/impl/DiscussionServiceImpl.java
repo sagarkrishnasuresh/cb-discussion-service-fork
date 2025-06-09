@@ -18,6 +18,8 @@ import com.igot.cb.discussion.repository.DiscussionAnswerPostReplyRepository;
 import com.igot.cb.discussion.repository.DiscussionRepository;
 import com.igot.cb.discussion.service.DiscussionService;
 import com.igot.cb.metrics.service.ApiMetricsTracker;
+import com.igot.cb.notificationUtill.HelperMethodService;
+import com.igot.cb.notificationUtill.NotificationTriggerService;
 import com.igot.cb.pores.cache.CacheService;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.elasticsearch.dto.SearchResult;
@@ -53,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static com.igot.cb.pores.util.Constants.*;
+
 @Service
 @Slf4j
 public class DiscussionServiceImpl implements DiscussionService {
@@ -83,6 +87,11 @@ public class DiscussionServiceImpl implements DiscussionService {
     private Producer producer;
     @Autowired
     private DiscussionAnswerPostReplyRepository discussionAnswerPostReplyRepository;
+    @Autowired
+    private NotificationTriggerService notificationTriggerService;
+    @Autowired
+    private HelperMethodService helperMethodService;
+
 
     @PostConstruct
     public void init() {
@@ -163,6 +172,10 @@ public class DiscussionServiceImpl implements DiscussionService {
             communityObject.put(Constants.STATUS, Constants.INCREMENT);
             communityObject.put(Constants.TYPE, Constants.POST);
             producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
+            Map<String, String> userPostCount = new HashMap<>();
+            userPostCount.put(Constants.USERID, userId);
+            userPostCount.put(Constants.STATUS, Constants.INCREMENT);
+            producer.push(cbServerProperties.getKafkaUserPostCount(), userPostCount);
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -462,6 +475,12 @@ public class DiscussionServiceImpl implements DiscussionService {
                         updateCacheForGlobalFeed(userId);
                         log.info("Updated cache for global feed");
                         producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
+                        if (Constants.QUESTION.equalsIgnoreCase(data.get(Constants.TYPE).asText())) {
+                            Map<String, String> userPostCount = new HashMap<>();
+                            userPostCount.put(Constants.USERID, userId);
+                            userPostCount.put(Constants.STATUS, Constants.DECREMENT);
+                            producer.push(cbServerProperties.getKafkaUserPostCount(), userPostCount);
+                        }
                         return response;
                     } else {
                         log.info("Discussion is already inactive.");
@@ -603,6 +622,24 @@ public class DiscussionServiceImpl implements DiscussionService {
                 updateCacheForFirstFivePages(dataNode.get(Constants.COMMUNITY_ID).asText(), false);
                 updateCacheForGlobalFeed(userId);
             }
+
+            String createdBy = dataNode.get(Constants.CREATED_BY).asText();
+
+            Map<String, Object> data = Map.of(
+                    Constants.COMMUNITY_ID, dataNode.get(Constants.COMMUNITY_ID).asText(),
+                    Constants.DISCUSSION_ID, discussionId
+            );
+
+            String firstName = helperMethodService.fetchUserFirstName(userId);
+            log.info("Notification trigger started");
+                if (type.equalsIgnoreCase(Constants.QUESTION)) {
+                    notificationTriggerService.triggerNotification(LIKED_POST, List.of(createdBy), TITLE, firstName, data);
+                } else if (type.equalsIgnoreCase(Constants.ANSWER_POST)) {
+                    notificationTriggerService.triggerNotification(LIKED_COMMENT, List.of(createdBy), TITLE, firstName, data);
+                } else if (type.equalsIgnoreCase(Constants.ANSWER_POST_REPLY)) {
+                    notificationTriggerService.triggerNotification(REPLIED_POST, List.of(createdBy), TITLE, firstName, data);
+                }
+
 
             if (Constants.ANSWER_POST.equals(type)) {
                 redisTemplate.opsForValue()
@@ -2046,4 +2083,5 @@ public class DiscussionServiceImpl implements DiscussionService {
         criteria.setFacets(Collections.emptyList());
         return criteria;
     }
+
 }
