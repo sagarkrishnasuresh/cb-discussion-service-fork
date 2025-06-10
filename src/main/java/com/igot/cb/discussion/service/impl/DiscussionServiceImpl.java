@@ -1496,6 +1496,12 @@ public class DiscussionServiceImpl implements DiscussionService {
             List<String> userTagIdsList = discussionToUserTagMap.get(discussionId);
             boolean hasCreatedBy = createdById != null && userDetailsMap.containsKey(createdById);
             if (hasCreatedBy) {
+                Map<String, Object> userData = (Map<String, Object>) userDetailsMap.get(createdById);
+                Object designationObj = userData.get(DESIGNATION_KEY);
+                String designationStr = designationObj != null ? designationObj.toString() : "";
+                if (designationStr.isBlank() || "null".equalsIgnoreCase(designationStr)) {
+                    userData.put(DESIGNATION_KEY, "");
+                }
                 discussion.put(Constants.CREATED_BY, userDetailsMap.get(createdById));
             }
             if (isAnswerPost && userTagIdsList != null && !userTagIdsList.isEmpty()) {
