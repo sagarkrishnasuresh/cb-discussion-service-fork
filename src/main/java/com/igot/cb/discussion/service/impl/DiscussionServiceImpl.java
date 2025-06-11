@@ -841,11 +841,13 @@ public class DiscussionServiceImpl implements DiscussionService {
                     Constants.DISCUSSION_ID, String.valueOf(id)
             );
 
+            String parentPostUserId  = discussionEntity.getData().get(CREATED_BY).asText();
+
             String createdBy = answerPostData.get(CREATED_BY).asText();
             String firstName = helperMethodService.fetchUserFirstName(createdBy);
             log.info("Notification trigger started for create answerPost");
 
-            notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(createdBy), TITLE, firstName, NotificationData);
+            notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(parentPostUserId), TITLE, firstName, NotificationData);
 
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
