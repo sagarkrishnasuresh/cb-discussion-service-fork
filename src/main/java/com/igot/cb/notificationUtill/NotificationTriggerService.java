@@ -41,6 +41,7 @@ public class NotificationTriggerService {
 
     public ApiResponse sendNotification(
             String subCategory,
+            String subType,
             List<String> userIds,
             Map<String, Object> message
     ) {
@@ -49,6 +50,9 @@ public class NotificationTriggerService {
         try {
             if (!StringUtils.hasText(subCategory)) {
                 throw new IllegalArgumentException("subCategory is required");
+            }
+            if (!StringUtils.hasText(subType)) {
+                throw new IllegalArgumentException("subType is required");
             }
 
             if (CollectionUtils.isEmpty(userIds)) {
@@ -61,6 +65,7 @@ public class NotificationTriggerService {
 
             Map<String, Object> payload = new HashMap<>();
             payload.put(SUB_CATEGORY, subCategory);
+            payload.put(SUB_TYPE,subType);
             payload.put(USER_IDS, userIds);
             payload.put(MESSAGE, message);
 
@@ -104,6 +109,7 @@ public class NotificationTriggerService {
 
     public void triggerNotification(
             String subCategory,
+            String subType,
             List<String> userIds,
             String title,
             String userName,
@@ -119,7 +125,7 @@ public class NotificationTriggerService {
         log.info("notifications message in triggerNotification:{}", message);
 
         try {
-            sendNotification(subCategory, userIds, message);
+            sendNotification(subCategory,subType, userIds, message);
             log.info("Notification sent successfully for subCategory: {}", subCategory);
         } catch (Exception e) {
             log.error("Notification failed for subCategory: {}", subCategory, e);

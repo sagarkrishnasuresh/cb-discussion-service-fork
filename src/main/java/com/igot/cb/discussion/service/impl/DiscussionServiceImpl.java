@@ -633,13 +633,13 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             String firstName = helperMethodService.fetchUserFirstName(userId);
             log.info("Notification trigger started");
-                if (type.equalsIgnoreCase(Constants.QUESTION)) {
-                    notificationTriggerService.triggerNotification(LIKED_POST, List.of(createdBy), TITLE, firstName, data);
-                } else if (type.equalsIgnoreCase(Constants.ANSWER_POST)) {
-                    notificationTriggerService.triggerNotification(LIKED_COMMENT, List.of(createdBy), TITLE, firstName, data);
-                } else if (type.equalsIgnoreCase(Constants.ANSWER_POST_REPLY)) {
-                    notificationTriggerService.triggerNotification(REPLIED_POST, List.of(createdBy), TITLE, firstName, data);
-                }
+            if (type.equalsIgnoreCase(Constants.QUESTION)) {
+                notificationTriggerService.triggerNotification(LIKED_POST, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
+            } else if (type.equalsIgnoreCase(Constants.ANSWER_POST)) {
+                notificationTriggerService.triggerNotification(POST_COMMENT, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
+            } else if (type.equalsIgnoreCase(Constants.ANSWER_POST_REPLY)) {
+                notificationTriggerService.triggerNotification(REPLIED_POST, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
+            }
 
             if (Constants.ANSWER_POST.equals(type)) {
                 redisTemplate.opsForValue()
@@ -835,6 +835,18 @@ public class DiscussionServiceImpl implements DiscussionService {
             producer.push(cbServerProperties.getCommunityPostCount(), communityObject);
 
             log.info("AnswerPost created successfully");
+
+            Map<String, Object> NotificationData = Map.of(
+                    Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
+                    Constants.DISCUSSION_ID, String.valueOf(id)
+            );
+
+            String createdBy = answerPostData.get(CREATED_BY).asText();
+            String firstName = helperMethodService.fetchUserFirstName(createdBy);
+            log.info("Notification trigger started for create answerPost");
+
+            notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(userId), TITLE, firstName, NotificationData);
+
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);

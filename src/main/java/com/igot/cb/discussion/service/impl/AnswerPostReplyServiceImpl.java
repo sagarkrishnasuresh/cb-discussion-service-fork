@@ -37,8 +37,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
-import static com.igot.cb.pores.util.Constants.REPLIED_COMMENT;
-import static com.igot.cb.pores.util.Constants.TITLE;
+import static com.igot.cb.pores.util.Constants.*;
 
 @Service
 @Slf4j
@@ -152,13 +151,14 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
 
-                Map<String, Object> notificationData = Map.of(
-                        Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
-                        Constants.DISCUSSION_ID, String.valueOf(id)
-                );
+            Map<String, Object> notificationData = Map.of(
+                    Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
+                    Constants.DISCUSSION_ID, String.valueOf(id)
+            );
+            String createdBy = answerPostReplyDataNode.get(Constants.CREATED_BY).asText();
 
-                String firstName = helperMethodService.fetchUserFirstName(userId);
-                notificationTriggerService.triggerNotification(REPLIED_COMMENT, List.of(userId), TITLE, firstName, notificationData);
+            String firstName = helperMethodService.fetchUserFirstName(createdBy);
+            notificationTriggerService.triggerNotification(REPLIED_COMMENT,ENGAGEMENT, List.of(userId), TITLE, firstName, notificationData);
 
         } catch (Exception e) {
             log.error("Failed to create AnswerPost: {}", e.getMessage(), e);
