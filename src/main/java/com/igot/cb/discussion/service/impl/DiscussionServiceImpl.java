@@ -845,7 +845,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             String firstName = helperMethodService.fetchUserFirstName(createdBy);
             log.info("Notification trigger started for create answerPost");
 
-            notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(userId), TITLE, firstName, NotificationData);
+            notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(createdBy), TITLE, firstName, NotificationData);
 
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
