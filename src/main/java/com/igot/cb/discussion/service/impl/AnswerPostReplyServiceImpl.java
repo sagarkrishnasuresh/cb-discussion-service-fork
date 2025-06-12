@@ -151,17 +151,15 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
 
-            String parentPostUserId = discussionEntity.getData().get(Constants.CREATED_BY).asText();
-
             Map<String, Object> notificationData = Map.of(
                     Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
                     Constants.DISCUSSION_ID, String.valueOf(id)
             );
+            String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
             String createdBy = answerPostReplyDataNode.get(Constants.CREATED_BY).asText();
-
             String firstName = helperMethodService.fetchUserFirstName(createdBy);
-            notificationTriggerService.triggerNotification(REPLIED_COMMENT,ENGAGEMENT, List.of(parentPostUserId), TITLE, firstName, notificationData);
-
+            log.info("Notification trigger started for create answerPost");
+            notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
         } catch (Exception e) {
             log.error("Failed to create AnswerPost: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_ANSWER_POST_REPLY, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);

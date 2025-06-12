@@ -836,18 +836,15 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             log.info("AnswerPost created successfully");
 
-            Map<String, Object> NotificationData = Map.of(
+            Map<String, Object> notificationData = Map.of(
                     Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
                     Constants.DISCUSSION_ID, String.valueOf(id)
             );
-
-            String parentPostUserId  = discussionEntity.getData().get(CREATED_BY).asText();
-
+            String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
             String createdBy = answerPostData.get(CREATED_BY).asText();
             String firstName = helperMethodService.fetchUserFirstName(createdBy);
             log.info("Notification trigger started for create answerPost");
-
-            notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(parentPostUserId), TITLE, firstName, NotificationData);
+            notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
 
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
