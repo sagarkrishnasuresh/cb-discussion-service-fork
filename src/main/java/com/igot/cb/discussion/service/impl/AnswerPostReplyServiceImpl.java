@@ -153,7 +153,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
 
             Map<String, Object> notificationData = Map.of(
                     Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
-                    Constants.DISCUSSION_ID, String.valueOf(id)
+                    Constants.DISCUSSION_ID, answerPostReplyDataNode.get(Constants.PARENT_DISCUSSION_ID).asText()
             );
             String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
             String createdBy = answerPostReplyDataNode.get(Constants.CREATED_BY).asText();

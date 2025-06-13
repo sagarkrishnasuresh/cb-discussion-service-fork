@@ -627,7 +627,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             Map<String, Object> data = Map.of(
                     Constants.COMMUNITY_ID, dataNode.get(Constants.COMMUNITY_ID).asText(),
-                    Constants.DISCUSSION_ID, discussionId
+                    Constants.DISCUSSION_ID,  type.equalsIgnoreCase(Constants.QUESTION) ? discussionId : discussionData.get(Constants.PARENT_DISCUSSION_ID)
             );
 
 
