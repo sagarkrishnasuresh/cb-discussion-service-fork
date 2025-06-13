@@ -838,7 +838,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             Map<String, Object> notificationData = Map.of(
                     Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
-                    Constants.DISCUSSION_ID, String.valueOf(id)
+                    Constants.DISCUSSION_ID,answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()
             );
             String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
             String createdBy = answerPostData.get(CREATED_BY).asText();
