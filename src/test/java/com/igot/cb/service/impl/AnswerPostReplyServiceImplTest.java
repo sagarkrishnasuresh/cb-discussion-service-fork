@@ -126,7 +126,7 @@ class AnswerPostReplyServiceImplTest {
         when(objectMapper.convertValue(any(Object.class), eq(Map.class))).thenReturn(new HashMap<>());
         when(discussionRepository.save(any())).thenReturn(mockDiscussionEntity());
         when(helperMethodService.fetchUserFirstName(anyString())).thenReturn("");
-        doNothing().when(notificationTriggerService).triggerNotification(any(),any(), anyList(), any(), any(), any());
+//        doNothing().when(notificationTriggerService).triggerNotification(any(),any(), anyList(), any(), any(), any());
 
         ApiResponse response = service.createAnswerPostReply(payload, token);
 
