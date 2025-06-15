@@ -623,22 +623,28 @@ public class DiscussionServiceImpl implements DiscussionService {
                 updateCacheForGlobalFeed(userId);
             }
 
-            String createdBy = dataNode.get(Constants.CREATED_BY).asText();
+            try {
+                String createdBy = dataNode.get(Constants.CREATED_BY).asText();
 
-            Map<String, Object> data = Map.of(
-                    Constants.COMMUNITY_ID, dataNode.get(Constants.COMMUNITY_ID).asText(),
-                    Constants.DISCUSSION_ID,  type.equalsIgnoreCase(Constants.QUESTION) ? discussionId : discussionData.get(Constants.PARENT_DISCUSSION_ID)
-            );
+                Map<String, Object> data = Map.of(
+                        Constants.COMMUNITY_ID, dataNode.get(Constants.COMMUNITY_ID).asText(),
+                        Constants.DISCUSSION_ID, type.equalsIgnoreCase(Constants.QUESTION) ? discussionId : discussionData.get(Constants.PARENT_DISCUSSION_ID)
+                );
 
 
-            String firstName = helperMethodService.fetchUserFirstName(userId);
-            log.info("Notification trigger started");
-            if (type.equalsIgnoreCase(Constants.QUESTION)) {
-                notificationTriggerService.triggerNotification(LIKED_POST, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
-            } else if (type.equalsIgnoreCase(Constants.ANSWER_POST)) {
-                notificationTriggerService.triggerNotification(POST_COMMENT, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
-            } else if (type.equalsIgnoreCase(Constants.ANSWER_POST_REPLY)) {
-                notificationTriggerService.triggerNotification(REPLIED_POST, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
+                String firstName = helperMethodService.fetchUserFirstName(userId);
+                log.info("Notification trigger started");
+                if (currentVote && !userId.equals(createdBy)) {
+                    if (type.equalsIgnoreCase(Constants.QUESTION)) {
+                        notificationTriggerService.triggerNotification(LIKED_POST, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
+                    } else if (type.equalsIgnoreCase(Constants.ANSWER_POST)) {
+                        notificationTriggerService.triggerNotification(POST_COMMENT, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
+                    } else if (type.equalsIgnoreCase(Constants.ANSWER_POST_REPLY)) {
+                        notificationTriggerService.triggerNotification(REPLIED_POST, ENGAGEMENT, List.of(createdBy), TITLE, firstName, data);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error while triggering notification", e);
             }
 
             if (Constants.ANSWER_POST.equals(type)) {
@@ -836,16 +842,21 @@ public class DiscussionServiceImpl implements DiscussionService {
 
             log.info("AnswerPost created successfully");
 
-            Map<String, Object> notificationData = Map.of(
-                    Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
-                    Constants.DISCUSSION_ID,answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()
-            );
-            String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
-            String createdBy = answerPostData.get(CREATED_BY).asText();
-            String firstName = helperMethodService.fetchUserFirstName(createdBy);
-            log.info("Notification trigger started for create answerPost");
-            notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
-
+            try {
+                Map<String, Object> notificationData = Map.of(
+                        Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
+                        Constants.DISCUSSION_ID, answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()
+                );
+                String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
+                String createdBy = answerPostData.get(CREATED_BY).asText();
+                String firstName = helperMethodService.fetchUserFirstName(createdBy);
+                log.info("Notification trigger started for create answerPost");
+                if (!userId.equals(createdBy)) {
+                    notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
+                }
+            } catch (Exception e) {
+                log.error("Error while triggering notification", e);
+            }
             map.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);

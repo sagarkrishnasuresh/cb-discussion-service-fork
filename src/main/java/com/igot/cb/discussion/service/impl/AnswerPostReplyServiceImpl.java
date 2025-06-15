@@ -150,16 +150,21 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);
-
-            Map<String, Object> notificationData = Map.of(
-                    Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
-                    Constants.DISCUSSION_ID, answerPostReplyDataNode.get(Constants.PARENT_DISCUSSION_ID).asText()
-            );
-            String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
-            String createdBy = answerPostReplyDataNode.get(Constants.CREATED_BY).asText();
-            String firstName = helperMethodService.fetchUserFirstName(createdBy);
-            log.info("Notification trigger started for create answerPost");
-            notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
+            try {
+                Map<String, Object> notificationData = Map.of(
+                        Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
+                        Constants.DISCUSSION_ID, answerPostReplyDataNode.get(Constants.PARENT_DISCUSSION_ID).asText()
+                );
+                String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
+                String createdBy = answerPostReplyDataNode.get(Constants.CREATED_BY).asText();
+                String firstName = helperMethodService.fetchUserFirstName(createdBy);
+                log.info("Notification trigger started for create answerPost");
+                if(!userId.equals(discussionOwner)) {
+                    notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
+                }
+            } catch (Exception e) {
+                log.error("Error while triggering notification", e);
+            }
         } catch (Exception e) {
             log.error("Failed to create AnswerPost: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_ANSWER_POST_REPLY, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
