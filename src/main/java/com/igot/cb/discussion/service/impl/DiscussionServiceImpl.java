@@ -851,7 +851,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 String createdBy = answerPostData.get(CREATED_BY).asText();
                 String firstName = helperMethodService.fetchUserFirstName(createdBy);
                 log.info("Notification trigger started for create answerPost");
-                if (!userId.equals(createdBy)) {
+                if (!userId.equals(discussionOwner)) {
                     notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
                 }
             } catch (Exception e) {
