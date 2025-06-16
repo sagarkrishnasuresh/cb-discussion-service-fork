@@ -1087,7 +1087,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             } else if (ANSWER_POST_REPLY.equals(type)) {
                 deleteCacheByCommunity(REPORTED_ANSWER_POST_REPLY_POSTS_CACHE_PREFIX + data.get(COMMUNITY_ID).asText());
             }
-            String redisKey = Constants.REPORT_STATISTICS_CACHE_PREFIX + discussionId;
+            String redisKey = Constants.REDIS_KEY_PREFIX + Constants.REPORT_STATISTICS_CACHE_PREFIX + discussionId;
             deleteCacheByCommunity(redisKey);
             log.info("Updated cache for global feed");
             map.put(Constants.DISCUSSION_ID, reportData.get(Constants.DISCUSSION_ID));
