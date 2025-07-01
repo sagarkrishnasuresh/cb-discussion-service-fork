@@ -11,6 +11,17 @@
     },
     "communityId": {
       "type": "string"
+    },
+    "mentionedUsers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "userName": { "type": "string" }
+        },
+        "required": ["userId", "userName"]
+      }
     }
   },
   "required": [

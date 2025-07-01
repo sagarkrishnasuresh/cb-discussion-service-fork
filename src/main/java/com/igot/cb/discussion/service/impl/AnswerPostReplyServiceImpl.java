@@ -100,6 +100,21 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         }
 
         try {
+            JsonNode mentionedUsersNode = answerPostDataReplyData.get(MENTIONED_USERS);
+            List<String> userIdList = new ArrayList<>();
+            if (mentionedUsersNode != null && mentionedUsersNode.isArray() && mentionedUsersNode.size() > 0) {
+                Map<String, JsonNode> uniqueUserMap = new LinkedHashMap<>();
+                mentionedUsersNode.forEach(node -> {
+                    String userid = node.path(USER_ID_RQST).asText(null);
+                    if (StringUtils.isNotBlank(userid) && !uniqueUserMap.containsKey(userid)) {
+                        uniqueUserMap.put(userid, node);
+                    }
+                });
+                ArrayNode cleanArray = objectMapper.createArrayNode();
+                uniqueUserMap.values().forEach(cleanArray::add);
+                ((ObjectNode) answerPostDataReplyData).set(MENTIONED_USERS, cleanArray);
+                userIdList.addAll(uniqueUserMap.keySet());
+            }
             ObjectNode answerPostReplyDataNode = (ObjectNode) answerPostDataReplyData;
             Map<String, Object> propertyMap = new HashMap<>();
             propertyMap.put(Constants.USERID, userId);
@@ -161,6 +176,9 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                 log.info("Notification trigger started for create answerPost");
                 if(!userId.equals(discussionOwner)) {
                     notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
+                }
+                if (CollectionUtils.isNotEmpty(userIdList)) {
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, notificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
@@ -356,6 +374,30 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
 
         try {
             ObjectNode answerPostReplyDataNode = (ObjectNode) answerPostReplyData;
+
+            Set<String> existingMentionedUserIds = new HashSet<>();
+            data.withArray(MENTIONED_USERS).forEach(userNode -> {
+                String userid = userNode.path(USER_ID_RQST).asText(null);
+                if (StringUtils.isNotBlank(userid)) existingMentionedUserIds.add(userid);
+            });
+            Set<String> seenUserIdsInRequest = new HashSet<>();
+            List<String> newlyAddedUserIds = new ArrayList<>();
+            ArrayNode uniqueMentionedUsers = objectMapper.createArrayNode();
+            JsonNode incomingMentionedUsers = answerPostReplyData.path(MENTIONED_USERS);
+            if (incomingMentionedUsers.isArray()) {
+                for (JsonNode userNode : incomingMentionedUsers) {
+                    String userid = userNode.path(USER_ID_RQST).asText(null);
+                    if (StringUtils.isNotBlank(userid) && seenUserIdsInRequest.add(userid)) {
+                        uniqueMentionedUsers.add(userNode);
+                        if (!existingMentionedUserIds.contains(userid)) {
+                            newlyAddedUserIds.add(userid);
+                        }
+                    }
+                }
+            }
+
+            answerPostReplyDataNode.set(MENTIONED_USERS, uniqueMentionedUsers);
+
             answerPostReplyDataNode.remove(Constants.ANSWER_POST_REPLY_ID);
             if (!answerPostReplyDataNode.has(Constants.IS_INITIAL_UPLOAD) || !answerPostReplyDataNode.get(Constants.IS_INITIAL_UPLOAD).asBoolean()) {
                 Timestamp currentTime = new Timestamp(System.currentTimeMillis());
@@ -376,6 +418,18 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                             data.get(Constants.PARENT_ANSWER_POST_ID).asText(),
                             data.get(Constants.COMMUNITY_ID).asText())));
             log.info("AnswerPostReply updated successfully");
+            try {
+                if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
+                    Map<String, Object> notificationData = Map.of(
+                            Constants.COMMUNITY_ID, data.get(Constants.COMMUNITY_ID).asText(),
+                            Constants.DISCUSSION_ID, data.get(Constants.PARENT_DISCUSSION_ID).asText()
+                    );
+                    String firstName = helperMethodService.fetchUserFirstName(userId);
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
+                }
+            } catch (Exception e) {
+                log.error("Error while triggering notification for update answerPostReply", e);
+            }
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);

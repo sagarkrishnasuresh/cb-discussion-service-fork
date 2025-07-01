@@ -124,6 +124,21 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
         updateMetricsApiCall(Constants.DISCUSSION_CREATE);
         try {
+            JsonNode mentionedUsersNode = discussionDetails.get(MENTIONED_USERS);
+            List<String> userIdList = new ArrayList<>();
+            if (mentionedUsersNode != null && mentionedUsersNode.isArray() && mentionedUsersNode.size() > 0) {
+                Map<String, JsonNode> uniqueUserMap = new LinkedHashMap<>();
+                mentionedUsersNode.forEach(node -> {
+                    String userid = node.path(USER_ID_RQST).asText(null);
+                    if (StringUtils.isNotBlank(userid) && !uniqueUserMap.containsKey(userid)) {
+                        uniqueUserMap.put(userid, node);
+                    }
+                });
+                ArrayNode cleanArray = objectMapper.createArrayNode();
+                uniqueUserMap.values().forEach(cleanArray::add);
+                ((ObjectNode) discussionDetails).set(MENTIONED_USERS, cleanArray);
+                userIdList.addAll(uniqueUserMap.keySet());
+            }
             ObjectNode discussionDetailsNode = (ObjectNode) discussionDetails;
             Map<String, Object> propertyMap = new HashMap<>();
             propertyMap.put(Constants.USERID, userId);
@@ -176,6 +191,18 @@ public class DiscussionServiceImpl implements DiscussionService {
             userPostCount.put(Constants.USERID, userId);
             userPostCount.put(Constants.STATUS, Constants.INCREMENT);
             producer.push(cbServerProperties.getKafkaUserPostCount(), userPostCount);
+            try {
+                if (CollectionUtils.isNotEmpty(userIdList)) {
+                    Map<String, Object> notificationData = Map.of(
+                            Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText(),
+                            Constants.DISCUSSION_ID, discussionDetails.get(Constants.DISCUSSION_ID).asText()
+                    );
+                    String firstName = helperMethodService.fetchUserFirstName(userId);
+                    notificationTriggerService.triggerNotification(TAGGED_POST, ALERT, userIdList, TITLE, firstName, notificationData);
+                }
+            } catch (Exception e) {
+                log.error("Error while triggering notification", e);
+            }
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -284,6 +311,31 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             ObjectNode data = (ObjectNode) discussionDbData.getData();
             ObjectNode updateDataNode = (ObjectNode) updateData;
+
+            Set<String> existingMentionedUserIds = new HashSet<>();
+            data.withArray(MENTIONED_USERS).forEach(userNode -> {
+                String userid = userNode.path(USER_ID_RQST).asText(null);
+                if (StringUtils.isNotBlank(userid)) existingMentionedUserIds.add(userid);
+            });
+            Set<String> seenUserIdsInRequest = new HashSet<>();
+            List<String> newlyAddedUserIds = new ArrayList<>();
+            ArrayNode uniqueMentionedUsers = objectMapper.createArrayNode();
+            JsonNode incomingMentionedUsers = updateData.path(MENTIONED_USERS);
+            if (incomingMentionedUsers.isArray()) {
+                for (JsonNode userNode : incomingMentionedUsers) {
+                    String userid = userNode.path(USER_ID_RQST).asText(null);
+                    if (StringUtils.isNotBlank(userid) && seenUserIdsInRequest.add(userid)) {
+                        uniqueMentionedUsers.add(userNode);
+                        if (!existingMentionedUserIds.contains(userid)) {
+                            newlyAddedUserIds.add(userid);
+                        }
+                    }
+                }
+            }
+
+            updateDataNode.set(MENTIONED_USERS, uniqueMentionedUsers);
+
+
             if (data.get(Constants.COMMUNITY_ID) != null && !data.get(Constants.COMMUNITY_ID).asText().equals(updateDataNode.get(Constants.COMMUNITY_ID).asText())) {
                 DiscussionServiceUtil.createErrorResponse(response, Constants.COMMUNITY_ID_CANNOT_BE_UPDATED, HttpStatus.BAD_REQUEST, Constants.FAILED);
                 return response;
@@ -326,6 +378,18 @@ public class DiscussionServiceImpl implements DiscussionService {
             updateCacheForFirstFivePages(communityId, false);
             updateCacheForGlobalFeed(userId);
             log.info("Updated cache for global feed");
+            try {
+                if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
+                    Map<String, Object> notificationData = Map.of(
+                            Constants.COMMUNITY_ID, updateData.get(Constants.COMMUNITY_ID).asText(),
+                            Constants.DISCUSSION_ID, updateData.get(Constants.PARENT_DISCUSSION_ID).asText()
+                    );
+                    String firstName = helperMethodService.fetchUserFirstName(userId);
+                    notificationTriggerService.triggerNotification(TAGGED_POST, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
+                }
+            } catch (Exception e) {
+                log.error("Error while triggering notification", e);
+            }
         } catch (Exception e) {
             log.error("Failed to update the discussion: ", e);
             DiscussionServiceUtil.createErrorResponse(response, "Failed to update the discussion", HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -786,6 +850,21 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
 
         try {
+            JsonNode mentionedUsersNode = answerPostData.get(MENTIONED_USERS);
+            List<String> userIdList = new ArrayList<>();
+            if (mentionedUsersNode != null && mentionedUsersNode.isArray() && mentionedUsersNode.size() > 0) {
+                Map<String, JsonNode> uniqueUserMap = new LinkedHashMap<>();
+                mentionedUsersNode.forEach(node -> {
+                    String userid = node.path(USER_ID_RQST).asText(null);
+                    if (StringUtils.isNotBlank(userid) && !uniqueUserMap.containsKey(userid)) {
+                        uniqueUserMap.put(userid, node);
+                    }
+                });
+                ArrayNode cleanArray = objectMapper.createArrayNode();
+                uniqueUserMap.values().forEach(cleanArray::add);
+                ((ObjectNode) answerPostData).set(MENTIONED_USERS, cleanArray);
+                userIdList.addAll(uniqueUserMap.keySet());
+            }
             ObjectNode answerPostDataNode = (ObjectNode) answerPostData;
             Map<String, Object> propertyMap = new HashMap<>();
             propertyMap.put(Constants.USERID, userId);
@@ -853,6 +932,9 @@ public class DiscussionServiceImpl implements DiscussionService {
                 log.info("Notification trigger started for create answerPost");
                 if (!userId.equals(discussionOwner)) {
                     notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
+                }
+                if (CollectionUtils.isNotEmpty(userIdList)) {
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, notificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
@@ -1239,6 +1321,28 @@ public class DiscussionServiceImpl implements DiscussionService {
 
         try {
             ObjectNode answerPostDataNode = (ObjectNode) answerPostData;
+            Set<String> existingMentionedUserIds = new HashSet<>();
+            data.withArray(MENTIONED_USERS).forEach(userNode -> {
+                String userid = userNode.path(USER_ID_RQST).asText(null);
+                if (StringUtils.isNotBlank(userid)) existingMentionedUserIds.add(userid);
+            });
+            Set<String> seenUserIdsInRequest = new HashSet<>();
+            List<String> newlyAddedUserIds = new ArrayList<>();
+            ArrayNode uniqueMentionedUsers = objectMapper.createArrayNode();
+            JsonNode incomingMentionedUsers = answerPostData.path(MENTIONED_USERS);
+            if (incomingMentionedUsers.isArray()) {
+                for (JsonNode userNode : incomingMentionedUsers) {
+                    String userid = userNode.path(USER_ID_RQST).asText(null);
+                    if (StringUtils.isNotBlank(userid) && seenUserIdsInRequest.add(userid)) {
+                        uniqueMentionedUsers.add(userNode);
+                        if (!existingMentionedUserIds.contains(userid)) {
+                            newlyAddedUserIds.add(userid);
+                        }
+                    }
+                }
+            }
+            answerPostDataNode.set(MENTIONED_USERS, uniqueMentionedUsers);
+
             answerPostDataNode.remove(Constants.ANSWER_POST_ID);
 
             if (!answerPostDataNode.has(Constants.IS_INITIAL_UPLOAD) || !answerPostDataNode.get(Constants.IS_INITIAL_UPLOAD).asBoolean()) {
@@ -1263,6 +1367,18 @@ public class DiscussionServiceImpl implements DiscussionService {
                             data.get(Constants.COMMUNITY_ID).asText(),
                             Constants.ANSWER_POST)));
             log.info("AnswerPost updated successfully");
+            try {
+                if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
+                    Map<String, Object> notificationData = Map.of(
+                            Constants.COMMUNITY_ID, data.get(Constants.COMMUNITY_ID).asText(),
+                            Constants.DISCUSSION_ID, discussionEntity.getDiscussionId()
+                    );
+                    String firstName = helperMethodService.fetchUserFirstName(userId);
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
+                }
+            } catch (Exception e) {
+                log.error("Error while triggering notification", e);
+            }
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);
             response.setResult(map);

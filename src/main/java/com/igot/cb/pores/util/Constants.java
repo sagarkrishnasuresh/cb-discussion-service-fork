@@ -264,6 +264,10 @@ public class Constants {
     public static final String SUB_TYPE ="subType";
     public static final String USER_IDS = "userIds";
     public static final String MESSAGE = "message";
+    public static final String TAGGED_COMMENT = "TAGGED_COMMENT";
+    public static final String TAGGED_POST = "TAGGED_POST";
+    public static final String ALERT = "ALERT";
+    public static final String MENTIONED_USERS = "mentionedUsers";
 
     private Constants() {
     }
