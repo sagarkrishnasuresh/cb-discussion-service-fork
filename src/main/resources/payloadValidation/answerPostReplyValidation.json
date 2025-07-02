@@ -38,6 +38,7 @@
   },
   "required": [
     "type",
+    "description",
     "parentDiscussionId",
     "parentAnswerPostId",
     "communityId"
