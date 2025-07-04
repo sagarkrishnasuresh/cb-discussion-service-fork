@@ -1722,7 +1722,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         StringBuffer errorMsg = new StringBuffer();
         List<String> errList = new ArrayList<>();
 
-        if (!searchData.containsKey(Constants.COMMUNITY_ID) && StringUtils.isBlank((String) searchData.get(Constants.COMMUNITY_ID))) {
+        if (!searchData.containsKey(Constants.COMMUNITY_ID) || StringUtils.isBlank((String) searchData.get(Constants.COMMUNITY_ID))) {
             errList.add(Constants.COMMUNITY_ID);
         }
         if (!searchData.containsKey(Constants.PAGE_NUMBER) || !(searchData.get(Constants.PAGE_NUMBER) instanceof Integer)) {
