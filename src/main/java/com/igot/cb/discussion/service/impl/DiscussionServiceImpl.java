@@ -381,8 +381,8 @@ public class DiscussionServiceImpl implements DiscussionService {
             try {
                 if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
                     Map<String, Object> notificationData = Map.of(
-                            Constants.COMMUNITY_ID, updateData.get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID, updateData.get(Constants.PARENT_DISCUSSION_ID).asText()
+                            Constants.COMMUNITY_ID, discussionDbData.getData().get(Constants.COMMUNITY_ID).asText(),
+                            Constants.DISCUSSION_ID,discussionDbData.getDiscussionId()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
                     notificationTriggerService.triggerNotification(TAGGED_POST, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
@@ -934,7 +934,11 @@ public class DiscussionServiceImpl implements DiscussionService {
                     notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
                 }
                 if (CollectionUtils.isNotEmpty(userIdList)) {
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, notificationData);
+                    Map<String, Object> answerPostNotificationData = Map.of(
+                            Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
+                            Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
+                    );
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, answerPostNotificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);

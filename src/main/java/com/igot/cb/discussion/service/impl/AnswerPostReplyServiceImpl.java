@@ -170,6 +170,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                         Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
                         Constants.DISCUSSION_ID, answerPostReplyDataNode.get(Constants.PARENT_DISCUSSION_ID).asText()
                 );
+
                 String discussionOwner = discussionEntity.getData().get(Constants.CREATED_BY).asText();
                 String createdBy = answerPostReplyDataNode.get(Constants.CREATED_BY).asText();
                 String firstName = helperMethodService.fetchUserFirstName(createdBy);
@@ -178,7 +179,11 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                     notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
                 }
                 if (CollectionUtils.isNotEmpty(userIdList)) {
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, notificationData);
+                    Map<String, Object> replyNotificationData = Map.of(
+                            Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
+                            Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
+                    );
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, replyNotificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
@@ -422,7 +427,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                 if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
                     Map<String, Object> notificationData = Map.of(
                             Constants.COMMUNITY_ID, data.get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID, data.get(Constants.PARENT_DISCUSSION_ID).asText()
+                            Constants.DISCUSSION_ID, discussionAnswerPostReplyEntity.getDiscussionId()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
                     notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
