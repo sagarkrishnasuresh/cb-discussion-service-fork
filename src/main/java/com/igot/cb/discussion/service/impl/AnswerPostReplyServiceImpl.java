@@ -183,7 +183,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                             Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
                             Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
                     );
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, replyNotificationData);
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, userIdList, TITLE, firstName, replyNotificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
@@ -430,7 +430,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                             Constants.DISCUSSION_ID, discussionAnswerPostReplyEntity.getDiscussionId()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, newlyAddedUserIds, TITLE, firstName, notificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification for update answerPostReply", e);

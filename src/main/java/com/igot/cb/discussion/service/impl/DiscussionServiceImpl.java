@@ -192,13 +192,16 @@ public class DiscussionServiceImpl implements DiscussionService {
             userPostCount.put(Constants.STATUS, Constants.INCREMENT);
             producer.push(cbServerProperties.getKafkaUserPostCount(), userPostCount);
             try {
+                String createdBy = discussionDetailsNode.get(Constants.CREATED_BY).asText();
                 if (CollectionUtils.isNotEmpty(userIdList)) {
                     Map<String, Object> notificationData = Map.of(
                             Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText(),
                             Constants.DISCUSSION_ID, discussionDetails.get(Constants.DISCUSSION_ID).asText()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
-                    notificationTriggerService.triggerNotification(TAGGED_POST, ALERT, userIdList, TITLE, firstName, notificationData);
+                    if(!userId.equals(createdBy)) {
+                        notificationTriggerService.triggerNotification(TAGGED_POST, ENGAGEMENT, userIdList, TITLE, firstName, notificationData);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
@@ -379,13 +382,16 @@ public class DiscussionServiceImpl implements DiscussionService {
             updateCacheForGlobalFeed(userId);
             log.info("Updated cache for global feed");
             try {
+                String createdBy = data.get(Constants.CREATED_BY).asText();
                 if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
                     Map<String, Object> notificationData = Map.of(
                             Constants.COMMUNITY_ID, discussionDbData.getData().get(Constants.COMMUNITY_ID).asText(),
                             Constants.DISCUSSION_ID,discussionDbData.getDiscussionId()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
-                    notificationTriggerService.triggerNotification(TAGGED_POST, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
+                    if(!userId.equals(createdBy)) {
+                        notificationTriggerService.triggerNotification(TAGGED_POST, ENGAGEMENT, newlyAddedUserIds, TITLE, firstName, notificationData);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
@@ -938,7 +944,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                             Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
                             Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
                     );
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, userIdList, TITLE, firstName, answerPostNotificationData);
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, userIdList, TITLE, firstName, answerPostNotificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
@@ -1378,7 +1384,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                             Constants.DISCUSSION_ID, discussionEntity.getDiscussionId()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ALERT, newlyAddedUserIds, TITLE, firstName, notificationData);
+                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, newlyAddedUserIds, TITLE, firstName, notificationData);
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
