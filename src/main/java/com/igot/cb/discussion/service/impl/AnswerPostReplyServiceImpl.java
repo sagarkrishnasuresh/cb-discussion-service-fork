@@ -36,6 +36,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.igot.cb.pores.util.Constants.*;
 
@@ -175,15 +176,20 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                 String createdBy = answerPostReplyDataNode.get(Constants.CREATED_BY).asText();
                 String firstName = helperMethodService.fetchUserFirstName(createdBy);
                 log.info("Notification trigger started for create answerPost");
-                if(!userId.equals(discussionOwner)) {
+                if (!userId.equals(discussionOwner)) {
                     notificationTriggerService.triggerNotification(REPLIED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
                 }
                 if (CollectionUtils.isNotEmpty(userIdList)) {
-                    Map<String, Object> replyNotificationData = Map.of(
-                            Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
-                    );
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, userIdList, TITLE, firstName, replyNotificationData);
+                    List<String> filteredUserIdList = userIdList.stream()
+                            .filter(uniqueId -> !uniqueId.equals(discussionOwner)).toList();
+                    if (CollectionUtils.isNotEmpty(filteredUserIdList)) {
+                        Map<String, Object> replyNotificationData = Map.of(
+                                Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
+                                Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
+                        );
+
+                        notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, filteredUserIdList, TITLE, firstName, replyNotificationData);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);

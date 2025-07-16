@@ -194,13 +194,16 @@ public class DiscussionServiceImpl implements DiscussionService {
             try {
                 String createdBy = discussionDetailsNode.get(Constants.CREATED_BY).asText();
                 if (CollectionUtils.isNotEmpty(userIdList)) {
-                    Map<String, Object> notificationData = Map.of(
-                            Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID, discussionDetails.get(Constants.DISCUSSION_ID).asText()
-                    );
-                    String firstName = helperMethodService.fetchUserFirstName(userId);
-                    if(!userId.equals(createdBy)) {
-                        notificationTriggerService.triggerNotification(TAGGED_POST, ENGAGEMENT, userIdList, TITLE, firstName, notificationData);
+                    List<String> filteredUserIdList = userIdList.stream()
+                            .filter(uniqueId -> !uniqueId.equals(createdBy)).toList();
+
+                    if (CollectionUtils.isNotEmpty(filteredUserIdList)) {
+                        Map<String, Object> notificationData = Map.of(
+                                Constants.COMMUNITY_ID, discussionDetails.get(Constants.COMMUNITY_ID).asText(),
+                                Constants.DISCUSSION_ID, discussionDetails.get(Constants.DISCUSSION_ID).asText()
+                        );
+                        String firstName = helperMethodService.fetchUserFirstName(userId);
+                        notificationTriggerService.triggerNotification(TAGGED_POST, ENGAGEMENT, filteredUserIdList, TITLE, firstName, notificationData);
                     }
                 }
             } catch (Exception e) {
@@ -382,14 +385,17 @@ public class DiscussionServiceImpl implements DiscussionService {
             updateCacheForGlobalFeed(userId);
             log.info("Updated cache for global feed");
             try {
-                String createdBy = data.get(Constants.CREATED_BY).asText();
+                String discussionOwner = discussionDbData.getData().get(Constants.CREATED_BY).asText();
                 if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
-                    Map<String, Object> notificationData = Map.of(
-                            Constants.COMMUNITY_ID, discussionDbData.getData().get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID,discussionDbData.getDiscussionId()
-                    );
-                    String firstName = helperMethodService.fetchUserFirstName(userId);
-                    if(!userId.equals(createdBy)) {
+                    List<String> filteredUserIds = newlyAddedUserIds.stream()
+                            .filter(id -> !id.equals(discussionOwner))
+                            .toList();
+                    if (CollectionUtils.isNotEmpty(filteredUserIds)) {
+                        Map<String, Object> notificationData = Map.of(
+                                Constants.COMMUNITY_ID, discussionDbData.getData().get(Constants.COMMUNITY_ID).asText(),
+                                Constants.DISCUSSION_ID, discussionDbData.getDiscussionId()
+                        );
+                        String firstName = helperMethodService.fetchUserFirstName(userId);
                         notificationTriggerService.triggerNotification(TAGGED_POST, ENGAGEMENT, newlyAddedUserIds, TITLE, firstName, notificationData);
                     }
                 }
@@ -940,11 +946,16 @@ public class DiscussionServiceImpl implements DiscussionService {
                     notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
                 }
                 if (CollectionUtils.isNotEmpty(userIdList)) {
-                    Map<String, Object> answerPostNotificationData = Map.of(
-                            Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
-                    );
-                    notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, userIdList, TITLE, firstName, answerPostNotificationData);
+                    List<String> filteredUserIdList = userIdList.stream()
+                            .filter(uniqueId -> !uniqueId.equals(discussionOwner)).toList();
+
+                    if (CollectionUtils.isNotEmpty(filteredUserIdList)) {
+                        Map<String, Object> answerPostNotificationData = Map.of(
+                                Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
+                                Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
+                        );
+                        notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, filteredUserIdList, TITLE, firstName, answerPostNotificationData);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
