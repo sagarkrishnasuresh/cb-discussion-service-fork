@@ -7,10 +7,12 @@
       "enum": ["question"]
     },
     "description": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "communityId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "mentionedUsers": {
       "type": "array",

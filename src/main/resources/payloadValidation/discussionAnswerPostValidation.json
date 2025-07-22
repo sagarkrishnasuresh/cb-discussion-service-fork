@@ -7,13 +7,16 @@
       "enum": ["answerPost"]
     },
     "parentDiscussionId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "communityId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "description": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "taggedUser": {
       "type": "array",
