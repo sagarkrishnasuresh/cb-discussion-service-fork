@@ -2,7 +2,7 @@ name: Java PR Scan
 
 on:
   pull_request:
-    branches: [cbrelease]
+    branches: [cbrelease-4.8.28]
 
 jobs:
   sonar-pr:
