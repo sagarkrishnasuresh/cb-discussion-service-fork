@@ -1,4 +1,4 @@
-name: Java PR Scan
+name: SonarQube PR Scan
 
 on:
   pull_request:
