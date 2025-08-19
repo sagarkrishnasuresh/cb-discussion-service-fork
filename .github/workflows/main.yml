@@ -1,4 +1,4 @@
-name: SonarQube PR Scan
+name: SonarQube PR
 
 on:
   pull_request:
