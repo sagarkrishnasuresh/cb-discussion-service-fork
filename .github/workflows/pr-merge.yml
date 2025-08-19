@@ -1,0 +1,15 @@
+name: Java PR Scan
+
+on:
+  pull_request:
+    branches: [cbrelease]
+
+jobs:
+  sonar-pr:
+    uses: KB-iGOT/sunbird-devops/.github/workflows/pr-merge.yml@cbrelease-4.8.27.3
+    with:
+      language: java
+      build_command: mvn clean verify  # or 'mvn clean install'
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
