@@ -120,7 +120,7 @@ class EsUtilServiceImplTest {
     @Test
     void testDeleteDocumentsByCriteria_noHits() throws IOException {
         // Given
-        Query query = Query.of(q -> q.matchAll(m -> m));
+        Query localQuery = Query.of(q -> q.matchAll(m -> m));
 
         TotalHits totalHits = new TotalHits.Builder()
                 .value(0L)
@@ -143,7 +143,7 @@ class EsUtilServiceImplTest {
                 .thenReturn(searchResponse);
 
         // When
-        esUtilService.deleteDocumentsByCriteria("test-index", query);
+        esUtilService.deleteDocumentsByCriteria("test-index", localQuery);
 
         // Then
         verify(elasticsearchClient, never()).bulk(any(BulkRequest.class));
@@ -153,11 +153,11 @@ class EsUtilServiceImplTest {
     @Test
     void testDeleteDocumentsByCriteria_exceptionThrown() throws IOException {
         // Arrange
-        Query query = Query.of(q -> q.matchAll(m -> m));
+        Query localQuery = Query.of(q -> q.matchAll(m -> m));
         when(elasticsearchClient.search(any(SearchRequest.class), eq(Object.class))).thenThrow(new IOException("search failed"));
 
         // Act
-        esUtilService.deleteDocumentsByCriteria("test-index", query);
+        esUtilService.deleteDocumentsByCriteria("test-index", localQuery);
 
         // Assert
         verify(elasticsearchClient, never()).bulk(any(BulkRequest.class));

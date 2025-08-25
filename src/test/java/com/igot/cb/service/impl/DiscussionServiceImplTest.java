@@ -4,22 +4,31 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cb.authentication.util.AccessTokenValidator;
 import com.igot.cb.discussion.entity.CommunityEntity;
+import com.igot.cb.discussion.entity.DiscussionAnswerPostReplyEntity;
 import com.igot.cb.discussion.entity.DiscussionEntity;
 import com.igot.cb.discussion.repository.CommunityEngagementRepository;
 import com.igot.cb.discussion.repository.DiscussionAnswerPostReplyRepository;
 import com.igot.cb.discussion.repository.DiscussionRepository;
 import com.igot.cb.discussion.service.impl.DiscussionServiceImpl;
+import com.igot.cb.notificationUtill.HelperMethodService;
+import com.igot.cb.notificationUtill.NotificationTriggerService;
 import com.igot.cb.pores.cache.CacheService;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.elasticsearch.dto.SearchResult;
 import com.igot.cb.pores.elasticsearch.service.EsUtilService;
-import com.igot.cb.pores.util.*;
+import com.igot.cb.pores.util.ApiResponse;
+import com.igot.cb.pores.util.CbServerProperties;
+import com.igot.cb.pores.util.Constants;
+import com.igot.cb.pores.util.PayloadValidation;
 import com.igot.cb.producer.Producer;
+import com.igot.cb.profanity.IProfanityCheckService;
 import com.igot.cb.transactional.cassandrautils.CassandraOperation;
+import com.igot.cb.transactional.service.RequestHandlerServiceImpl;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,44 +42,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.cloud.storage.BaseStorageService;
 import org.sunbird.cloud.storage.factory.StorageServiceFactory;
+
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.*;
 
+import static com.igot.cb.pores.util.Constants.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
-import java.util.Optional;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-
-import static org.mockito.Mockito.when;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import static org.mockito.ArgumentMatchers.anyString;
-
-import com.igot.cb.discussion.entity.DiscussionAnswerPostReplyEntity;
-
-import com.igot.cb.pores.util.ApiResponse;
-import com.igot.cb.pores.util.Constants;
-import java.io.File;
-
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.multipart.MultipartFile;
-import static org.mockito.Mockito.mock;
-
-import com.igot.cb.pores.util.CbServerProperties;
-import com.igot.cb.pores.util.PayloadValidation;
-
-import org.mockito.Spy;
+import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
 class DiscussionServiceImplTest {
@@ -97,8 +85,6 @@ class DiscussionServiceImplTest {
     @Mock
     private AccessTokenValidator accessTokenValidator;
     @Mock
-    private RedisTemplate<String, Object> redisTemp;
-    @Mock
     private CommunityEngagementRepository communityEngagementRepository;
     @Mock
     private Producer producer;
@@ -109,6 +95,15 @@ class DiscussionServiceImplTest {
 
     @Mock
     private BaseStorageService baseStorageService;
+
+    @Mock
+    private RequestHandlerServiceImpl requestHandlerService;
+    @Mock private IProfanityCheckService profanityCheckService;
+
+    @Mock
+    private NotificationTriggerService notificationTriggerService;
+    @Mock
+    private HelperMethodService helperMethodService;
 
     @Mock
     private ObjectMapper objectMapper; // mock
@@ -127,13 +122,13 @@ class DiscussionServiceImplTest {
     @Spy
     private Logger log = LoggerFactory.getLogger(DiscussionServiceImpl.class);
 
-    private static final String firstName = "John";
-    private static final String profileImg = "profile.jpg";
-    private static final String designation = "Engineer";
-    private static final String department = "IT";
+    private static final String FIRST_NAME = "John";
+    private static final String PROFILE_IMG = "profile.jpg";
+    private static final String DESIGNATION = "Engineer";
+    private static final String DEPARTMENT = "IT";
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         // Setup discussion entity
         discussionEntity = new DiscussionEntity();
         discussionEntity.setDiscussionId("discussion123");
@@ -168,13 +163,20 @@ class DiscussionServiceImplTest {
         ReflectionTestUtils.setField(discussionService, "payloadValidation", payloadValidation);
         ReflectionTestUtils.setField(discussionService, "accessTokenValidator", accessTokenValidator);
         ReflectionTestUtils.setField(discussionService, "producer", producer);
+        ReflectionTestUtils.setField(discussionService, "requestHandlerService", requestHandlerService);
+        ReflectionTestUtils.setField(discussionService, "storageService", baseStorageService);
 
         // Mock static factory method
         try (MockedStatic<StorageServiceFactory> mockedFactory = Mockito.mockStatic(StorageServiceFactory.class)) {
             mockedFactory.when(() -> StorageServiceFactory.getStorageService(any()))
-                    .thenReturn(mock(BaseStorageService.class));
-            discussionService.init(); // Assuming your service has an init() method
+                    .thenReturn(baseStorageService);
         }
+        
+        // Mock additional properties needed for createDiscussion
+        when(cbServerProperties.getCommunityPostCount()).thenReturn("community-post-count");
+        when(cbServerProperties.getKafkaUserPostCount()).thenReturn("user-post-count");
+        when(cbServerProperties.getDiscussionCloudFolderName()).thenReturn("discussions");
+        when(cbServerProperties.getDiscussionContainerName()).thenReturn("container");
     }
 
     @Test
@@ -217,10 +219,10 @@ class DiscussionServiceImplTest {
     }
 
     @Test
-    void testCreateDiscussion_failedToCreateDiscussion() throws Exception {
+    void testCreateDiscussion_failedToCreateDiscussion() {
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        ObjectNode discussionDetails = objectMapper.createObjectNode();
+        ObjectMapper newObjectMapper = new ObjectMapper();
+        ObjectNode discussionDetails = newObjectMapper.createObjectNode();
         discussionDetails.put("communityId", "comm-1");
         discussionDetails.put("title", "Sample Title");
         discussionDetails.put("description", "Sample description");
@@ -236,7 +238,7 @@ class DiscussionServiceImplTest {
         mockCommunity.setActive(true);
         mockCommunity.setData(objectMapper.createObjectNode().put("name", "Test Community"));
 
-        when(communityEngagementRepository.findByCommunityIdAndIsActive(eq("comm-1"), eq(true)))
+        when(communityEngagementRepository.findByCommunityIdAndIsActive("comm-1", true))
                 .thenReturn(Optional.of(mockCommunity));
 
         // Mock: User is part of community
@@ -269,7 +271,6 @@ class DiscussionServiceImplTest {
         Assertions.assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getResponseCode());
         Assertions.assertEquals(Constants.FAILED, response.getParams().getStatus());
     }
-
 
     @Test
     void testReadDiscussion_whenIdIsEmpty() {
@@ -336,7 +337,7 @@ class DiscussionServiceImplTest {
     }
 
     @Test
-    void testReadDiscussion_whenExceptionThrown() throws Exception {
+    void testReadDiscussion_whenExceptionThrown() {
         when(cacheService.getCache(Constants.DISCUSSION_CACHE_PREFIX + VALID_DISCUSSION_ID))
                 .thenThrow(new RuntimeException("Redis error"));
 
@@ -513,7 +514,6 @@ class DiscussionServiceImplTest {
     @Test
     void testDeleteDiscussion_invalidAuthToken() {
         // Arrange
-        String discussionId = "discussion123";
         String type = "question";
         String invalidToken = "invalid_token";
 
@@ -535,14 +535,13 @@ class DiscussionServiceImplTest {
     @Test
     void test_deleteDiscussion_1() {
         // Arrange
-        String discussionId = "testDiscussionId";
         String type = "question";
-        String token = "invalidToken";
+        String invalidToken = "invalidToken";
 
-        when(accessTokenValidator.verifyUserToken(token)).thenReturn("");
+        when(accessTokenValidator.verifyUserToken(any())).thenReturn("");
 
         // Act
-        ApiResponse response = discussionService.deleteDiscussion(discussionId, type, token);
+        ApiResponse response = discussionService.deleteDiscussion(discussionId, type, invalidToken);
 
         // Assert
         assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
@@ -557,14 +556,11 @@ class DiscussionServiceImplTest {
     @Test
     void test_deleteDiscussion_2() {
         // Arrange
-        String discussionId = "test-discussion-id";
         String type = "invalid-type";
-        String token = "valid-token";
-        String userId = "test-user-id";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         ObjectNode dataNode = new ObjectMapper().createObjectNode();
         dataNode.put(Constants.TYPE, "actual-type");
         discussionEntity.setData(dataNode);
@@ -588,14 +584,11 @@ class DiscussionServiceImplTest {
     @Test
     void test_deleteDiscussion_3() {
         // Arrange
-        String discussionId = "validDiscussionId";
         String type = "question";
-        String token = "validToken";
-        String userId = "validUserId";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode data = realObjectMapper.createObjectNode();
         data.put(Constants.TYPE, "question");
@@ -638,14 +631,11 @@ class DiscussionServiceImplTest {
     @Test
     void test_deleteDiscussion_4() {
         // Arrange
-        String discussionId = "testDiscussionId";
         String type = "ANSWER_POST";
-        String token = "validToken";
-        String userId = "testUserId";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode data = realObjectMapper.createObjectNode();
         data.put(Constants.TYPE, type);
@@ -677,10 +667,7 @@ class DiscussionServiceImplTest {
     @Test
     void test_deleteDiscussion_6() {
         // Arrange
-        String discussionId = "nonexistent_discussion";
         String type = "question";
-        String token = "valid_token";
-        String userId = "valid_user";
 
         // Mock accessTokenValidator
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
@@ -788,7 +775,7 @@ class DiscussionServiceImplTest {
         Map<String, Object> filterMap = new HashMap<>();
         filterMap.put("communityId", communityIds);
 
-        SearchCriteria searchCriteria = new SearchCriteria();
+        searchCriteria = new SearchCriteria();
         searchCriteria.setFilterCriteriaMap(new HashMap<>(filterMap));
 
         // Serialize using real ObjectMapper
@@ -812,7 +799,7 @@ class DiscussionServiceImplTest {
         // Force type mismatch to trigger INVALID_TYPE logic
         Map<String, Object> mockDiscussionData1 = new HashMap<>();
         mockDiscussionData1.put(Constants.TYPE, "answer");
-        when(objectMapper.convertValue(eq(dataNode), eq(HashMap.class))).thenReturn((HashMap) mockDiscussionData1);
+        when(objectMapper.convertValue(dataNode,HashMap.class)).thenReturn((HashMap) mockDiscussionData1);
 
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any())).thenReturn(new ArrayList<>());
         when(cassandraOperation.insertRecord(any(), any(), any())).thenReturn(insertResponse);
@@ -836,8 +823,6 @@ class DiscussionServiceImplTest {
         DiscussionEntity discussion = new DiscussionEntity();
         discussion.setIsActive(true);
         discussion.setData(dataNode);
-
-        Map<String, Object> voteRecord = Map.of(Constants.VOTE_TYPE, true);
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
         when(discussionRepository.findById(discussionId)).thenReturn(Optional.of(discussion));
@@ -1041,10 +1026,9 @@ class DiscussionServiceImplTest {
     @Test
     void test_createAnswerPost_2() {
         // Arrange
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode answerPostData = objectMapper.createObjectNode()
+        ObjectMapper newObjectMapper = new ObjectMapper();
+        JsonNode answerPostData = newObjectMapper.createObjectNode()
                 .put(Constants.PARENT_DISCUSSION_ID, "nonexistent_id");
-        String token = "valid_token";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("valid_user_id");
         when(discussionRepository.findById(any())).thenReturn(Optional.empty());
@@ -1065,12 +1049,9 @@ class DiscussionServiceImplTest {
     @Test
     void test_createAnswerPost_3() {
         // Arrange
-        ObjectMapper objectMapper = new ObjectMapper();
-        ObjectNode answerPostData = objectMapper.createObjectNode();
+        ObjectMapper newObjectMapper = new ObjectMapper();
+        ObjectNode answerPostData = newObjectMapper.createObjectNode();
         answerPostData.put(Constants.PARENT_DISCUSSION_ID, "parentId");
-
-        String token = "validToken";
-        String userId = "testUser";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
@@ -1102,9 +1083,6 @@ class DiscussionServiceImplTest {
         ObjectNode answerPostData = new ObjectMapper().createObjectNode();
         answerPostData.put(Constants.PARENT_DISCUSSION_ID, "parent123");
         answerPostData.put(Constants.COMMUNITY_ID, "community1");
-
-        String token = "validToken";
-        String userId = "user123";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
@@ -1142,9 +1120,6 @@ class DiscussionServiceImplTest {
         answerPostData.put(Constants.PARENT_DISCUSSION_ID, "parent123");
         answerPostData.put(Constants.COMMUNITY_ID, "community2");
 
-        String token = "validToken";
-        String userId = "user123";
-
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
         DiscussionEntity parentDiscussion = new DiscussionEntity();
@@ -1173,15 +1148,11 @@ class DiscussionServiceImplTest {
     @Test
     void test_createAnswerPost_6() {
         // Arrange
-        ObjectMapper realObjectMapper = new ObjectMapper();
         ObjectNode answerPostData = realObjectMapper.createObjectNode();
         answerPostData.put(Constants.PARENT_DISCUSSION_ID, "parentId");
         answerPostData.put(Constants.COMMUNITY_ID, "communityId");
 
-        String token = "validToken";
-        String userId = "validUserId";
-
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode data = realObjectMapper.createObjectNode();
         data.put(Constants.TYPE, "question");
@@ -1213,8 +1184,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_createAnswerPost_7() {
         // Arrange
-        String token = "validToken";
-        String userId = "validUserId";
         String communityId = "validCommunityId";
         String parentDiscussionId = "validParentDiscussionId";
 
@@ -1238,7 +1207,6 @@ class DiscussionServiceImplTest {
         when(discussionRepository.save(any(DiscussionEntity.class))).thenReturn(new DiscussionEntity());
         when(cbServerProperties.getDiscussionEntity()).thenReturn("discussionEntity");
         when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("elasticPath");
-//        when(cbServerProperties.getCommunityPostCount()).thenReturn("communityPostCount");
 
         // Act
         ApiResponse response = discussionService.createAnswerPost(answerPostData, token);
@@ -1402,7 +1370,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_1() {
         // Arrange
-        String token = "testToken";
         Map<String, Object> reportData = new HashMap<>();
         reportData.put(Constants.DISCUSSION_ID, ""); // Invalid empty discussion ID
 
@@ -1423,9 +1390,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_10() {
         // Arrange
-        String token = "validToken";
-        String userId = "testUser";
-        String discussionId = "testDiscussionId";
         String type = Constants.ANSWER_POST_REPLY;
 
         Map<String, Object> reportData = new HashMap<>();
@@ -1448,8 +1412,6 @@ class DiscussionServiceImplTest {
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(anyString(), anyString(), anyMap(), any(), any()))
                 .thenReturn(Collections.emptyList());
         when(cbServerProperties.isDiscussionReportHidePost()).thenReturn(true);
-//        when(cbServerProperties.getReportPostUserLimit()).thenReturn(5);
-
         // Act
         ApiResponse response = discussionService.report(token, reportData);
 
@@ -1464,8 +1426,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_12() {
         // Arrange
-        String token = "validToken";
-        String userId = "testUser";
         Map<String, Object> reportData = new HashMap<>();
         reportData.put(Constants.DISCUSSION_ID, "testDiscussionId");
         reportData.put(Constants.DISCUSSION_TEXT, "Test discussion text");
@@ -1489,7 +1449,6 @@ class DiscussionServiceImplTest {
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(anyString(), anyString(), anyMap(), any(), any()))
                 .thenReturn(new ArrayList<>());
         when(cbServerProperties.isDiscussionReportHidePost()).thenReturn(true);
-        //when(cbServerProperties.getReportPostUserLimit()).thenReturn(5);
         when(objectMapper.createObjectNode()).thenReturn(realObjectMapper.createObjectNode());
         when(cbServerProperties.getDiscussionEntity()).thenReturn("discussionEntity");
         when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("elasticPath");
@@ -1511,8 +1470,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_15() {
         // Arrange
-        String token = "validToken";
-        String userId = "testUser";
         Map<String, Object> reportData = new HashMap<>();
         reportData.put(Constants.DISCUSSION_ID, "testDiscussionId");
         reportData.put(Constants.TYPE, Constants.ANSWER_POST_REPLY);
@@ -1579,8 +1536,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_3() {
         // Arrange
-        String token = "validToken";
-        String userId = "validUserId";
         Map<String, Object> reportData = new HashMap<>();
         reportData.put(Constants.DISCUSSION_ID, "nonexistentId");
         reportData.put(Constants.TYPE, "question");
@@ -1605,8 +1560,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_4() {
         // Arrange
-        String token = "validToken";
-        String userId = "testUser";
         Map<String, Object> reportData = new HashMap<>();
         reportData.put(Constants.DISCUSSION_ID, "testDiscussionId");
         reportData.put(Constants.TYPE, Constants.ANSWER_POST_REPLY);
@@ -1638,15 +1591,13 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_5() {
         // Arrange
-        String token = "validToken";
-        String userId = "validUserId";
         Map<String, Object> reportData = new HashMap<>();
         reportData.put(Constants.DISCUSSION_ID, "discussionId");
         reportData.put(Constants.TYPE, "question");
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(false);
         ObjectNode dataNode = JsonNodeFactory.instance.objectNode();
         dataNode.put(Constants.TYPE, "question");
@@ -1671,9 +1622,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_6() {
         // Arrange
-        String token = "validToken";
-        String userId = "validUserId";
-        String discussionId = "validDiscussionId";
         String type = Constants.ANSWER_POST_REPLY;
 
         Map<String, Object> reportData = new HashMap<>();
@@ -1707,8 +1655,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_7() {
         // Arrange
-        String token = "validToken";
-        String userId = "testUser";
         Map<String, Object> reportData = new HashMap<>();
         reportData.put(Constants.DISCUSSION_ID, "replyId");
         reportData.put(Constants.TYPE, Constants.ANSWER_POST_REPLY);
@@ -1741,9 +1687,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_report_8() {
         // Arrange
-        String token = "validToken";
-        String userId = "testUser";
-        String discussionId = "testDiscussionId";
         String type = Constants.ANSWER_POST_REPLY;
 
         Map<String, Object> reportData = new HashMap<>();
@@ -1790,8 +1733,6 @@ class DiscussionServiceImplTest {
         // Arrange
         MultipartFile emptyFile = new MockMultipartFile("file", new byte[0]);
         String communityId = "community123";
-        String discussionId = "discussion123";
-
         // Act
         ApiResponse response = discussionService.uploadFile(emptyFile, communityId, discussionId);
 
@@ -1812,10 +1753,9 @@ class DiscussionServiceImplTest {
         MultipartFile mockFile = mock(MultipartFile.class);
         when(mockFile.isEmpty()).thenReturn(false);
         String communityId = "validCommunityId";
-        String discussionId = "";
 
         // Act
-        ApiResponse response = discussionService.uploadFile(mockFile, communityId, discussionId);
+        ApiResponse response = discussionService.uploadFile(mockFile, communityId, "");
 
         // Assert
         assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
@@ -1832,7 +1772,6 @@ class DiscussionServiceImplTest {
     void test_uploadFile_3() {
         // Arrange
         MultipartFile mockFile = new MockMultipartFile("file", "test.txt", "text/plain", "Hello, World!".getBytes());
-        String discussionId = "validDiscussionId";
         String blankCommunityId = "";
 
         // Act
@@ -1853,13 +1792,11 @@ class DiscussionServiceImplTest {
     void test_uploadFile_4() {
         MultipartFile mFile = new MockMultipartFile("file", "test.txt", "text/plain", "test content".getBytes());
         String communityId = "community123";
-        String discussionId = "discussion123";
 
         when(cbServerProperties.getDiscussionCloudFolderName()).thenReturn("discussions");
         when(cbServerProperties.getDiscussionContainerName()).thenReturn("container");
 
         doAnswer(invocation -> {
-            File file = invocation.getArgument(0);
             String uploadFolderPath = invocation.getArgument(1);
             String containerName = invocation.getArgument(2);
 
@@ -1908,7 +1845,6 @@ class DiscussionServiceImplTest {
         MultipartFile emptyFile = mock(MultipartFile.class);
         when(emptyFile.isEmpty()).thenReturn(true);
         String communityId = "testCommunity";
-        String discussionId = "testDiscussion";
 
         // Act
         ApiResponse response = discussionService.uploadFile(emptyFile, communityId, discussionId);
@@ -1928,7 +1864,6 @@ class DiscussionServiceImplTest {
         when(mFile.getBytes()).thenThrow(new IOException("Simulated IO error"));
 
         String communityId = "community123";
-        String discussionId = "discussion123";
 
         // Act
         ApiResponse response = discussionService.uploadFile(mFile, communityId, discussionId);
@@ -2003,7 +1938,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_bookmarkDiscussion_1() {
         // Arrange
-        String token = "validToken";
         String communityId = "validCommunityId";
         String blankDiscussionId = "";
 
@@ -2023,13 +1957,8 @@ class DiscussionServiceImplTest {
      */
     @Test
     void test_bookmarkDiscussion_2() {
-        // Arrange
-        String token = "validToken";
-        String communityId = "";
-        String discussionId = "validDiscussionId";
-
         // Act
-        ApiResponse response = discussionService.bookmarkDiscussion(token, communityId, discussionId);
+        ApiResponse response = discussionService.bookmarkDiscussion(token, "", discussionId);
 
         // Assert
         assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
@@ -2047,7 +1976,6 @@ class DiscussionServiceImplTest {
         // Arrange
         String invalidToken = "invalidToken";
         String communityId = "community123";
-        String discussionId = "discussion123";
 
         when(accessTokenValidator.verifyUserToken(invalidToken)).thenReturn(Constants.UNAUTHORIZED);
 
@@ -2068,10 +1996,7 @@ class DiscussionServiceImplTest {
     @Test
     void test_bookmarkDiscussion_4() {
         // Arrange
-        String token = "validToken";
         String communityId = "community123";
-        String discussionId = "nonexistentDiscussion";
-        String userId = "user123";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
         when(discussionRepository.findById(discussionId)).thenReturn(Optional.empty());
@@ -2093,14 +2018,11 @@ class DiscussionServiceImplTest {
     @Test
     void test_bookmarkDiscussion_5() {
         // Arrange
-        String token = "validToken";
         String communityId = "validCommunityId";
-        String discussionId = "validDiscussionId";
-        String userId = "validUserId";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(false);
         ObjectNode dataNode = objectMapper.createObjectNode();
         dataNode.put(Constants.COMMUNITY_ID, communityId);
@@ -2126,15 +2048,12 @@ class DiscussionServiceImplTest {
     @Test
     void test_bookmarkDiscussion_6() {
         // Arrange
-        String token = "validToken";
-        String userId = "user123";
         String communityId = "community1";
-        String discussionId = "discussion123";
         String bookmarkedCommunityId = "community2";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode dataNode = objectMapper.createObjectNode();
         dataNode.put(Constants.COMMUNITY_ID, bookmarkedCommunityId);
@@ -2159,14 +2078,11 @@ class DiscussionServiceImplTest {
     @Test
     void test_bookmarkDiscussion_7() {
         // Arrange
-        String token = "validToken";
         String communityId = "community123";
-        String discussionId = "discussion123";
-        String userId = "user123";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode dataNode = JsonNodeFactory.instance.objectNode();
         dataNode.put(Constants.COMMUNITY_ID, communityId);
@@ -2201,14 +2117,11 @@ class DiscussionServiceImplTest {
     @Test
     void test_bookmarkDiscussion_8() {
         // Arrange
-        String token = "validToken";
-        String userId = "user123";
         String communityId = "community1";
-        String discussionId = "discussion123";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode data = realObjectMapper.createObjectNode();
         data.put(Constants.COMMUNITY_ID, communityId);
@@ -2273,10 +2186,8 @@ class DiscussionServiceImplTest {
     @Test
     void test_updateAnswerPost_2() {
         // Arrange
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode answerPostData = objectMapper.createObjectNode()
+        JsonNode answerPostData = realObjectMapper.createObjectNode()
                 .put(Constants.ANSWER_POST_ID, "nonexistentId");
-        String token = "validToken";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("validUserId");
         when(discussionRepository.findById("nonexistentId")).thenReturn(Optional.empty());
@@ -2302,12 +2213,9 @@ class DiscussionServiceImplTest {
         ObjectNode answerPostData = mapper.createObjectNode();
         answerPostData.put(Constants.ANSWER_POST_ID, "testAnswerPostId");
 
-        String token = "validToken";
-        String userId = "validUserId";
-
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode data = mapper.createObjectNode();
         data.put(Constants.TYPE, "QUESTION"); // Set type to something other than ANSWER_POST
@@ -2333,11 +2241,10 @@ class DiscussionServiceImplTest {
         // Arrange
         ObjectNode answerPostData = realObjectMapper.createObjectNode();
         answerPostData.put(Constants.ANSWER_POST_ID, "answerPost123");
-        String token = "validToken";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("user123");
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode data = realObjectMapper.createObjectNode();
         data.put(Constants.TYPE, Constants.ANSWER_POST);
@@ -2363,17 +2270,13 @@ class DiscussionServiceImplTest {
     @Test
     void test_updateAnswerPost_5() {
         // Arrange
-        ObjectMapper realObjectMapper = new ObjectMapper();
         ObjectNode answerPostData = realObjectMapper.createObjectNode();
         answerPostData.put(Constants.ANSWER_POST_ID, "answerPost123");
         answerPostData.put("content", "Updated content");
 
-        String token = "validToken";
-        String userId = "user123";
-
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setIsActive(true);
         ObjectNode data = realObjectMapper.createObjectNode();
         data.put(Constants.TYPE, Constants.ANSWER_POST);
@@ -2407,8 +2310,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_updateAnswerPost_6() {
         // Arrange
-        String token = "validToken";
-        String userId = "validUserId";
         String answerId = "validAnswerId";
 
         ObjectNode answerPostData = new ObjectMapper().createObjectNode();
@@ -2416,7 +2317,7 @@ class DiscussionServiceImplTest {
         answerPostData.put(Constants.IS_INITIAL_UPLOAD, true);
         answerPostData.put("content", "Updated answer content");
 
-        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity = new DiscussionEntity();
         discussionEntity.setDiscussionId(answerId);
         discussionEntity.setIsActive(true);
         ObjectNode data = new ObjectMapper().createObjectNode();
@@ -2448,8 +2349,6 @@ class DiscussionServiceImplTest {
         // Arrange
         ObjectNode answerPostData = new ObjectMapper().createObjectNode();
         answerPostData.put(Constants.ANSWER_POST_ID, "answer-post-123");
-
-        String token = "valid.jwt.token";
 
         // Mock a valid discussion entity
         DiscussionEntity mockEntity = new DiscussionEntity();
@@ -2489,8 +2388,6 @@ class DiscussionServiceImplTest {
         // Arrange
         String communityId = "validCommunityId";
         String blankDiscussionId = "";
-        String token = "validToken";
-
         // Act
         ApiResponse response = discussionService.unBookmarkDiscussion(communityId, blankDiscussionId, token);
 
@@ -2507,13 +2404,8 @@ class DiscussionServiceImplTest {
     */
     @Test
     void test_unBookmarkDiscussion_2() {
-        // Arrange
-        String discussionId = "validDiscussionId";
-        String communityId = "";  // Blank community ID
-        String token = "validToken";
-
         // Act
-        ApiResponse response = discussionService.unBookmarkDiscussion(communityId, discussionId, token);
+        ApiResponse response = discussionService.unBookmarkDiscussion("", discussionId, token);
 
         // Assert
         assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
@@ -2530,7 +2422,6 @@ class DiscussionServiceImplTest {
     void test_unBookmarkDiscussion_3() {
         // Arrange
         String communityId = "validCommunityId";
-        String discussionId = "validDiscussionId";
         String invalidToken = "invalidToken";
 
         when(accessTokenValidator.verifyUserToken(invalidToken)).thenReturn(Constants.UNAUTHORIZED);
@@ -2553,9 +2444,6 @@ class DiscussionServiceImplTest {
     void test_unBookmarkDiscussion_4() {
         // Arrange
         String communityId = "validCommunityId";
-        String discussionId = "validDiscussionId";
-        String token = "validToken";
-        String userId = "validUserId";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
 
@@ -2584,27 +2472,6 @@ class DiscussionServiceImplTest {
     }
 
     /**
-     * Test case for unBookmarkDiscussion method when the discussionId is blank.
-     * This test verifies that the method returns an error response with BAD_REQUEST status
-     * and INVALID_DISCUSSION_ID error message when the discussionId is blank.
-     */
-    @Test
-    void test_unBookmarkDiscussion_blankDiscussionId() {
-        // Arrange
-        String token = "validToken";
-        String communityId = "validCommunityId";
-        String blankDiscussionId = "";
-
-        // Act
-        ApiResponse response = discussionService.unBookmarkDiscussion(communityId, blankDiscussionId, token);
-
-        // Assert
-        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
-        assertEquals(Constants.FAILED, response.getMessage());
-        assertEquals(Constants.INVALID_DISCUSSION_ID, response.getParams().getErr());
-    }
-
-    /**
      * Test case for getBookmarkedDiscussions method when the error message is not blank.
      * This test verifies that the method returns an error response with BAD_REQUEST status
      * and the appropriate error message when the request data is invalid.
@@ -2612,7 +2479,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_getBookmarkedDiscussions_1() {
         // Arrange
-        String token = "validToken";
         Map<String, Object> requestData = new HashMap<>();
         // Intentionally leave out required fields to trigger an error
 
@@ -2658,8 +2524,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_getBookmarkedDiscussions_3() {
         // Arrange
-        String token = "validToken";
-        String userId = "validUserId";
         String communityId = "validCommunityId";
         Map<String, Object> requestData = new HashMap<>();
         requestData.put(Constants.COMMUNITY_ID, communityId);
@@ -2688,8 +2552,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_getBookmarkedDiscussions_4() {
         // Arrange
-        String token = "validToken";
-        String userId = "validUserId";
         Map<String, Object> requestData = new HashMap<>();
         requestData.put(Constants.COMMUNITY_ID, "community123");
         requestData.put(Constants.PAGE, 1);
@@ -2710,7 +2572,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_getBookmarkedDiscussions_invalidRequestData() {
         // Arrange
-        String token = "validToken";
         Map<String, Object> invalidRequestData = new HashMap<>(); // Empty request data
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("validUserId");
@@ -2731,8 +2592,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_getBookmarkedDiscussions_5() throws Exception {
         // Arrange
-        String token = "validToken";
-        String userId = "user123";
         String communityId = "community123";
         Map<String, Object> requestData = new HashMap<>();
         requestData.put(Constants.COMMUNITY_ID, communityId);
@@ -2957,7 +2816,6 @@ class DiscussionServiceImplTest {
         Map<String, Object> data = new HashMap<>();
         Map<String, Object> requestData = new HashMap<>();
         data.put("request", requestData);
-        String token = "validToken";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("validUserId");
 
@@ -2978,8 +2836,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_getEnrichedDiscussionData_3() {
         // Arrange
-        String token = "validToken";
-        String userId = "testUser";
         Map<String, Object> data = new HashMap<>();
         Map<String, Object> requestData = new HashMap<>();
         List<Map<String, Object>> communityFilters = new ArrayList<>();
@@ -3021,7 +2877,6 @@ class DiscussionServiceImplTest {
         requestData.put(Constants.COMMUNITY_FILTERS, communityFilters);
         requestData.put(Constants.FILTERS, Arrays.asList(Constants.BOOKMARKS, Constants.REPORTED));
         data.put("request", requestData);
-        String token = "validToken";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("user123");
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(anyString(), anyString(), anyMap(), any(), any()))
@@ -3057,7 +2912,6 @@ class DiscussionServiceImplTest {
         requestData.put(Constants.COMMUNITY_FILTERS, communityFilters);
         requestData.put(Constants.FILTERS, Arrays.asList(Constants.LIKES, Constants.REPORTED));
         data.put("request", requestData);
-        String token = "validToken";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("user123");
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(
@@ -3105,7 +2959,6 @@ class DiscussionServiceImplTest {
         requestData.put(Constants.COMMUNITY_FILTERS, communityFilters);
         requestData.put(Constants.FILTERS, Arrays.asList(Constants.LIKES, Constants.BOOKMARKS));
         data.put("request", requestData);
-        String token = "validToken";
 
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("user123");
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(anyString(), anyString(), anyMap(), anyList(), any()))
@@ -3127,7 +2980,6 @@ class DiscussionServiceImplTest {
     @Test
     void test_getGlobalFeed_1() {
         // Arrange
-        SearchCriteria searchCriteria = new SearchCriteria();
         String invalidToken = "invalidToken";
         boolean isOverride = false;
 
@@ -3160,16 +3012,15 @@ class DiscussionServiceImplTest {
     void testGetGlobalFeed_validTokenWithCommunities() {
         when(accessTokenValidator.verifyUserToken("token")).thenReturn("user123");
 
-        Map<String, Object> record = new HashMap<>();
-        record.put(Constants.STATUS, true);
-        record.put(Constants.COMMUNITY_ID_KEY, "community1");
-        List<Map<String, Object>> records = Collections.singletonList(record);
+        Map<String, Object> recordMap = new HashMap<>();
+        recordMap.put(Constants.STATUS, true);
+        recordMap.put(Constants.COMMUNITY_ID_KEY, "community1");
+        List<Map<String, Object>> records = Collections.singletonList(recordMap);
 
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
                 .thenReturn(records);
 
         // mock searchDiscussion
-        ApiResponse mockResponse = ProjectUtil.createDefaultResponse(Constants.DISCUSSION_GET_GLOBAL_FEED_API);
         when(cbServerProperties.getDiscussionEntity()).thenReturn("discussionEntity");
         when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("somePath");
         when(cbServerProperties.getSearchResultRedisTtl()).thenReturn(300L);
@@ -3189,18 +3040,18 @@ class DiscussionServiceImplTest {
 
     @Test
     void testFetchUserFromPrimary_withCompleteProfileDetails() throws Exception {
-        String profileJson = "{ \"profileImg\": \"" + profileImg + "\", \"designation\": \"" + designation + "\", \"employmentDetails\": { \"department\": \"" + department + "\" } }";
+        String profileJson = "{ \"profileImg\": \"" + PROFILE_IMG + "\", \"designation\": \"" + DESIGNATION + "\", \"employmentDetails\": { \"department\": \"" + DEPARTMENT + "\" } }";
 
         Map<String, Object> userInfo = Map.of(
                 Constants.ID, userId,
-                Constants.FIRST_NAME, firstName,
+                Constants.FIRST_NAME, FIRST_NAME,
                 Constants.PROFILE_DETAILS, profileJson
         );
 
         Map<String, Object> parsedProfileDetails = Map.of(
-                Constants.PROFILE_IMG, profileImg,
-                Constants.DESIGNATION_KEY, designation,
-                Constants.EMPLOYMENT_DETAILS, Map.of(Constants.DEPARTMENT_KEY, department)
+                Constants.PROFILE_IMG, PROFILE_IMG,
+                Constants.DESIGNATION_KEY, DESIGNATION,
+                Constants.EMPLOYMENT_DETAILS, Map.of(Constants.DEPARTMENT_KEY, DEPARTMENT)
         );
 
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(
@@ -3217,17 +3068,17 @@ class DiscussionServiceImplTest {
 
         Map<String, Object> userMap = (Map<String, Object>) result.get(0);
         assertEquals(userId, userMap.get(Constants.USER_ID_KEY));
-        assertEquals(firstName, userMap.get(Constants.FIRST_NAME_KEY));
-        assertEquals(profileImg, userMap.get(Constants.PROFILE_IMG_KEY));
-        assertEquals(profileImg, userMap.get(Constants.DESIGNATION_KEY)); // because of code bug
-        assertEquals(department, userMap.get(Constants.DEPARTMENT));
+        assertEquals(FIRST_NAME, userMap.get(Constants.FIRST_NAME_KEY));
+        assertEquals(PROFILE_IMG, userMap.get(Constants.PROFILE_IMG_KEY));
+        assertEquals(PROFILE_IMG, userMap.get(Constants.DESIGNATION_KEY)); // because of code bug
+        assertEquals(DEPARTMENT, userMap.get(Constants.DEPARTMENT));
     }
 
     @Test
     void testFetchUserFromPrimary_withEmptyProfileDetails() {
         Map<String, Object> userInfo = Map.of(
                 Constants.ID, userId,
-                Constants.FIRST_NAME, firstName,
+                Constants.FIRST_NAME, FIRST_NAME,
                 Constants.PROFILE_DETAILS, ""
         );
 
@@ -3242,7 +3093,7 @@ class DiscussionServiceImplTest {
 
         Map<String, Object> userMap = (Map<String, Object>) result.get(0);
         assertEquals(userId, userMap.get(Constants.USER_ID_KEY));
-        assertEquals(firstName, userMap.get(Constants.FIRST_NAME_KEY));
+        assertEquals(FIRST_NAME, userMap.get(Constants.FIRST_NAME_KEY));
         assertFalse(userMap.containsKey(Constants.PROFILE_IMG_KEY));
     }
 
@@ -3252,7 +3103,7 @@ class DiscussionServiceImplTest {
 
         Map<String, Object> userInfo = Map.of(
                 Constants.ID, userId,
-                Constants.FIRST_NAME, firstName,
+                Constants.FIRST_NAME, FIRST_NAME,
                 Constants.PROFILE_DETAILS, invalidProfileJson
         );
 
@@ -3270,21 +3121,21 @@ class DiscussionServiceImplTest {
 
         Map<String, Object> userMap = (Map<String, Object>) result.get(0);
         assertEquals(userId, userMap.get(Constants.USER_ID_KEY));
-        assertEquals(firstName, userMap.get(Constants.FIRST_NAME_KEY));
+        assertEquals(FIRST_NAME, userMap.get(Constants.FIRST_NAME_KEY));
     }
 
     @Test
     void testFetchUserFromPrimary_withPartialProfileDetails() throws Exception {
-        String profileJson = "{ \"profileImg\": \"" + profileImg + "\" }";
+        String profileJson = "{ \"profileImg\": \"" + PROFILE_IMG + "\" }";
 
         Map<String, Object> userInfo = Map.of(
                 Constants.ID, userId,
-                Constants.FIRST_NAME, firstName,
+                Constants.FIRST_NAME, FIRST_NAME,
                 Constants.PROFILE_DETAILS, profileJson
         );
 
         Map<String, Object> parsedProfileDetails = Map.of(
-                Constants.PROFILE_IMG, profileImg
+                Constants.PROFILE_IMG, PROFILE_IMG
         );
 
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(
@@ -3300,7 +3151,7 @@ class DiscussionServiceImplTest {
         assertEquals(1, result.size());
 
         Map<String, Object> userMap = (Map<String, Object>) result.get(0);
-        assertEquals(profileImg, userMap.get(Constants.PROFILE_IMG_KEY));
+        assertEquals(PROFILE_IMG, userMap.get(Constants.PROFILE_IMG_KEY));
         assertFalse(userMap.containsKey(Constants.DESIGNATION_KEY));
         assertFalse(userMap.containsKey(Constants.DEPARTMENT));
     }
@@ -3329,17 +3180,15 @@ class DiscussionServiceImplTest {
         when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(result);
 
         // The JSON string you want to parse as mock criteria (must be consistent)
-        String trendingCriteriaJson = """
-    {
-      "filterCriteriaMap": {
-        "communityId": "community-123",
-        "type": "QUESTION",
-        "categoryType": ["DOCUMENT"]
-      },
-      "requestedFields": [],
-      "pageNumber": 1
-    }
-    """;
+        String trendingCriteriaJson = "{" +
+                "\"filterCriteriaMap\": {" +
+                "\"communityId\": \"community-123\"," +
+                "\"type\": \"QUESTION\"," +
+                "\"categoryType\": [\"DOCUMENT\"]" +
+                "}," +
+                "\"requestedFields\": []," +
+                "\"pageNumber\": 1" +
+                "}";
 
         // Prepare the mock SearchCriteria from JSON string
         SearchCriteria mockTrendingCriteria = new SearchCriteria();
@@ -3355,6 +3204,532 @@ class DiscussionServiceImplTest {
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getResponseCode());
         assertEquals("Index: 0, Size: 0",response.getParams().getErrMsg());
+    }
+
+    @Test
+    void testFetchDataForKeys_isUserDataTrue_successAndFailure() throws Exception {
+        List<String> keys = Arrays.asList("key1", "key2");
+
+        // hget returns two string values
+        when(cacheService.hget(anyList())).thenReturn(Arrays.asList("{\"name\":\"User1\"}", "{\"invalidJson\":}"));
+
+        // First JSON parse success
+        Object parsedUser = new Object();
+        when(objectMapper.readValue("{\"name\":\"User1\"}", Object.class)).thenReturn(parsedUser);
+
+        // Second JSON parse fails
+        when(objectMapper.readValue("{\"invalidJson\":}", Object.class)).thenThrow(new RuntimeException("parse error"));
+
+        List<Object> result = discussionService.fetchDataForKeys(keys, true);
+
+        // First parsed correctly, second failed → null returned for second
+        assertTrue(result.contains(parsedUser));
+        assertTrue(result.contains(null));
+
+        verify(cacheService, times(1)).hget(keys);
+        verify(cacheService, never()).hgetMulti(anyList());
+    }
+
+    @Test
+    void testFetchDataForKeys_isUserDataFalse_withNullValue() throws Exception {
+        List<String> keys = Arrays.asList("key1", "key2");
+
+        // hgetMulti returns [null, validJson]
+        when(cacheService.hgetMulti(anyList())).thenReturn(Arrays.asList(null, "{\"name\":\"User2\"}"));
+
+        Object parsedUser = new Object();
+        when(objectMapper.readValue("{\"name\":\"User2\"}", Object.class)).thenReturn(parsedUser);
+
+        List<Object> result = discussionService.fetchDataForKeys(keys, false);
+
+        // Only second key has value → first key filtered out
+        assertEquals(1, result.size());
+        assertEquals(parsedUser, result.get(0));
+
+        verify(cacheService, never()).hget(anyList());
+        verify(cacheService, times(1)).hgetMulti(keys);
+    }
+
+    @Test
+    void testCreateDiscussion_retun500() throws Exception {
+        // --- Arrange ---
+        String communityId = "comm123";
+
+        ObjectMapper realMapper = new ObjectMapper();
+        ObjectNode discussionJson = realMapper.createObjectNode();
+        discussionJson.put(Constants.COMMUNITY_ID, communityId);
+        discussionJson.put("title", "My first post");
+
+        // mock auth
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+
+        // mock community validation
+        when(communityEngagementRepository.findByCommunityIdAndIsActive(communityId, true))
+                .thenReturn(Optional.of(new CommunityEntity()));
+
+        // mock cassandra check (user part of community)
+        Map<String, Object> recordMap = new HashMap<>();
+        recordMap.put(Constants.STATUS, true);
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                anyString(), anyString(), anyMap(), anyList(), any())
+        ).thenReturn(List.of(recordMap));
+
+        // mock repository save
+        DiscussionEntity savedEntity = new DiscussionEntity();
+        savedEntity.setDiscussionId("post123");
+        savedEntity.setIsActive(true);
+        savedEntity.setData(discussionJson);
+        when(discussionRepository.save(any())).thenReturn(savedEntity);
+
+        // real ObjectMapper for convertValue
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(invocation -> realMapper.convertValue(invocation.getArgument(0), Map.class));
+
+        when(objectMapper.createObjectNode()).thenReturn(realMapper.createObjectNode());
+
+        // cbServerProperties stubs
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion_entity");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("/discussion/path");
+        when(cbServerProperties.getCommunityPostCount()).thenReturn("community_post_count");
+        when(cbServerProperties.getKafkaUserPostCount()).thenReturn("user_post_count");
+        when(cbServerProperties.getDiscussionEsDefaultPageSize()).thenReturn(10);
+        when(cbServerProperties.getDiscussionFeedRedisTtl()).thenReturn(3600L);
+
+        // --- Act ---
+        ApiResponse result = discussionService.createDiscussion(discussionJson, token);
+
+        // --- Assert ---
+        assertNotNull(result);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getResponseCode());
+    }
+
+    @Test
+    void testUpdateAnswerPost_success_withProfanityProcessing() {
+
+        ObjectMapper realMapper = new ObjectMapper();
+
+        // Incoming JSON
+        ObjectNode requestNode = realMapper.createObjectNode();
+        requestNode.put(Constants.ANSWER_POST_ID, discussionId);
+        requestNode.put(Constants.TYPE, Constants.ANSWER_POST);
+        requestNode.put(Constants.STATUS, "active");
+        requestNode.put(Constants.LANGUAGE, "en"); // ensures profanityCheckService is called
+
+        ArrayNode mentionedUsers = realMapper.createArrayNode();
+        ObjectNode mentionedUser = realMapper.createObjectNode();
+        mentionedUser.put(Constants.USER_ID_RQST, "userX");
+        mentionedUsers.add(mentionedUser);
+        requestNode.set(Constants.MENTIONED_USERS, mentionedUsers);
+
+        // Mock token validation
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+
+        // Mock DB entity
+        DiscussionEntity entity = new DiscussionEntity();
+        entity.setDiscussionId(discussionId);
+        entity.setIsActive(true);
+
+        ObjectNode storedData = realMapper.createObjectNode();
+        storedData.put(Constants.TYPE, Constants.ANSWER_POST);
+        storedData.put(Constants.STATUS, "active");
+        storedData.put(Constants.PARENT_DISCUSSION_ID, "parent-1");
+        storedData.put(Constants.COMMUNITY_ID, "comm-1");
+        storedData.set(Constants.MENTIONED_USERS, realMapper.createArrayNode());
+        entity.setData(storedData);
+
+        when(discussionRepository.findById(discussionId)).thenReturn(Optional.of(entity));
+        when(discussionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // mock ObjectMapper.convertValue
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(inv -> realMapper.convertValue(inv.getArgument(0), Map.class));
+        when(objectMapper.createObjectNode()).thenAnswer(inv -> realMapper.createObjectNode());
+
+        // cb props
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion_entity");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("/discussion/path");
+
+        // --- Act ---
+        ApiResponse response = discussionService.updateAnswerPost(requestNode, token);
+
+        // --- Assert ---
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+        assertTrue(response.getResult() instanceof Map);
+
+        Map<?, ?> resultMap = (Map<?, ?>) response.getResult();
+        assertFalse(resultMap.containsKey(Constants.PROFANITY_RESPONSE)); // removed
+        assertFalse(resultMap.containsKey("isProfane")); // removed after putting
+
+        // --- Verify interactions ---
+        verify(discussionRepository, times(1)).save(any());
+        verify(esUtilService).updateDocument(any(), eq(discussionId), anyMap(), any());
+        verify(cacheService).putCache(contains(discussionId), any(ObjectNode.class));
+    }
+
+    @Test
+    void testCreateDiscussion_success_basic() {
+        ObjectNode discussionDetails = realObjectMapper.createObjectNode();
+        discussionDetails.put(Constants.COMMUNITY_ID, "community-1");
+        discussionDetails.put("title", "Test Discussion");
+        discussionDetails.put(Constants.TYPE, Constants.QUESTION);
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(communityEngagementRepository.findByCommunityIdAndIsActive("community-1", true))
+                .thenReturn(Optional.of(new CommunityEntity()));
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of(Constants.STATUS, true)));
+        
+        DiscussionEntity savedEntity = new DiscussionEntity();
+        savedEntity.setDiscussionId("discussion-123");
+        when(discussionRepository.save(any())).thenReturn(savedEntity);
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(invocation -> realObjectMapper.convertValue(invocation.getArgument(0), Map.class));
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("path");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+        when(cbServerProperties.getFilterCriteriaForGlobalFeed()).thenReturn("{\"requestedFields\":[],\"filterCriteriaMap\":{}}");
+        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(new SearchResult());
+
+        ApiResponse response = discussionService.createDiscussion(discussionDetails, token);
+
+        assertEquals(HttpStatus.CREATED, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+    }
+
+    @Test
+    void testCreateDiscussion_withMentionedUsers() {
+        ObjectNode discussionDetails = realObjectMapper.createObjectNode();
+        discussionDetails.put(Constants.COMMUNITY_ID, "community-1");
+        discussionDetails.put("title", "Test Discussion");
+        discussionDetails.put(Constants.TYPE, Constants.QUESTION);
+
+        ArrayNode mentionedUsers = realObjectMapper.createArrayNode();
+        ObjectNode user1 = realObjectMapper.createObjectNode();
+        user1.put(Constants.USER_ID_RQST, "user-1");
+        mentionedUsers.add(user1);
+        discussionDetails.set(Constants.MENTIONED_USERS, mentionedUsers);
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(communityEngagementRepository.findByCommunityIdAndIsActive("community-1", true))
+                .thenReturn(Optional.of(new CommunityEntity()));
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of(Constants.STATUS, true)));
+        
+        DiscussionEntity savedEntity = new DiscussionEntity();
+        savedEntity.setDiscussionId("discussion-123");
+        when(discussionRepository.save(any())).thenReturn(savedEntity);
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(invocation -> realObjectMapper.convertValue(invocation.getArgument(0), Map.class));
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("path");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+        when(cbServerProperties.getFilterCriteriaForGlobalFeed()).thenReturn("{\"requestedFields\":[],\"filterCriteriaMap\":{}}");
+        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(new SearchResult());
+
+        ApiResponse response = discussionService.createDiscussion(discussionDetails, token);
+
+        assertEquals(HttpStatus.CREATED, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+    }
+
+    @Test
+    void testCreateDiscussion_withDuplicateUsers() {
+        ObjectNode discussionDetails = realObjectMapper.createObjectNode();
+        discussionDetails.put(Constants.COMMUNITY_ID, "community-1");
+        discussionDetails.put("title", "Test Discussion");
+        discussionDetails.put(Constants.TYPE, Constants.QUESTION);
+
+        ArrayNode mentionedUsers = realObjectMapper.createArrayNode();
+        ObjectNode user1 = realObjectMapper.createObjectNode();
+        user1.put(Constants.USER_ID_RQST, "user-1");
+        ObjectNode user1Duplicate = realObjectMapper.createObjectNode();
+        user1Duplicate.put(Constants.USER_ID_RQST, "user-1");
+        mentionedUsers.add(user1);
+        mentionedUsers.add(user1Duplicate);
+        discussionDetails.set(Constants.MENTIONED_USERS, mentionedUsers);
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(communityEngagementRepository.findByCommunityIdAndIsActive("community-1", true))
+                .thenReturn(Optional.of(new CommunityEntity()));
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of(Constants.STATUS, true)));
+        
+        DiscussionEntity savedEntity = new DiscussionEntity();
+        savedEntity.setDiscussionId("discussion-123");
+        when(discussionRepository.save(any())).thenReturn(savedEntity);
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(invocation -> realObjectMapper.convertValue(invocation.getArgument(0), Map.class));
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("path");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+        when(cbServerProperties.getFilterCriteriaForGlobalFeed()).thenReturn("{\"requestedFields\":[],\"filterCriteriaMap\":{}}");
+        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(new SearchResult());
+
+        ApiResponse response = discussionService.createDiscussion(discussionDetails, token);
+
+        assertEquals(HttpStatus.CREATED, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+    }
+
+    @Test
+    void testCreateDiscussion_withGlobalFeed() {
+        ObjectNode discussionDetails = realObjectMapper.createObjectNode();
+        discussionDetails.put(Constants.COMMUNITY_ID, "community-1");
+        discussionDetails.put("title", "Test Discussion");
+        discussionDetails.put(Constants.TYPE, Constants.QUESTION);
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(communityEngagementRepository.findByCommunityIdAndIsActive("community-1", true))
+                .thenReturn(Optional.of(new CommunityEntity()));
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of(Constants.STATUS, true)));
+        
+        DiscussionEntity savedEntity = new DiscussionEntity();
+        savedEntity.setDiscussionId("discussion-123");
+        when(discussionRepository.save(any())).thenReturn(savedEntity);
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(invocation -> realObjectMapper.convertValue(invocation.getArgument(0), Map.class));
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("path");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+        when(cbServerProperties.getDiscussionEsDefaultPageSize()).thenReturn(10);
+        when(cbServerProperties.getFilterCriteriaForGlobalFeed()).thenReturn("{\"requestedFields\":[],\"filterCriteriaMap\":{}}");
+        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(new SearchResult());
+
+        ApiResponse response = discussionService.createDiscussion(discussionDetails, token);
+
+        assertEquals(HttpStatus.CREATED, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+    }
+
+    @Test
+    void testCreateDiscussion_withAllFields() {
+        ObjectNode discussionDetails = realObjectMapper.createObjectNode();
+        discussionDetails.put(Constants.COMMUNITY_ID, "community-1");
+        discussionDetails.put("title", "Complete Test Discussion");
+        discussionDetails.put("description", "Complete test description");
+        discussionDetails.put(Constants.TYPE, Constants.QUESTION);
+        discussionDetails.put("tags", "test,discussion");
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(communityEngagementRepository.findByCommunityIdAndIsActive("community-1", true))
+                .thenReturn(Optional.of(new CommunityEntity()));
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of(Constants.STATUS, true)));
+        
+        DiscussionEntity savedEntity = new DiscussionEntity();
+        savedEntity.setDiscussionId("discussion-123");
+        when(discussionRepository.save(any())).thenReturn(savedEntity);
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(invocation -> realObjectMapper.convertValue(invocation.getArgument(0), Map.class));
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("path");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+        when(cbServerProperties.getFilterCriteriaForGlobalFeed()).thenReturn("{\"requestedFields\":[],\"filterCriteriaMap\":{}}");
+        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(new SearchResult());
+
+        ApiResponse response = discussionService.createDiscussion(discussionDetails, token);
+
+        assertEquals(HttpStatus.CREATED, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+        assertNotNull(response.getResult());
+        
+        Map<String, Object> result = response.getResult();
+        assertEquals("community-1", result.get(Constants.COMMUNITY_ID));
+        assertEquals("Complete Test Discussion", result.get("title"));
+        assertEquals(userId, result.get(Constants.CREATED_BY));
+        assertEquals(0L, result.get(Constants.UP_VOTE_COUNT));
+        assertEquals(Constants.ACTIVE, result.get(Constants.STATUS));
+        assertEquals(true, result.get(Constants.IS_ACTIVE));
+        assertNotNull(result.get(Constants.DISCUSSION_ID));
+        assertNotNull(result.get(Constants.CREATED_ON));
+        assertNotNull(result.get(Constants.UPDATED_ON));
+    }
+
+    @Test
+    void testUpdateDiscussion_success_withDocumentType() throws JsonProcessingException {
+        ObjectNode updateData = realObjectMapper.createObjectNode();
+        updateData.put(Constants.DISCUSSION_ID, "discussion-123");
+        updateData.put(Constants.COMMUNITY_ID, "community-1");
+        updateData.put("title", "Updated Title");
+
+        ArrayNode categoryType = realObjectMapper.createArrayNode();
+        categoryType.add(Constants.DOCUMENT);
+        updateData.set(Constants.CATEGORY_TYPE, categoryType);
+
+        // Update discussion entity data to include category type
+        ObjectNode entityData = (ObjectNode) discussionEntity.getData();
+        entityData.set(Constants.CATEGORY_TYPE, categoryType);
+        discussionEntity.setData(entityData);
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(discussionRepository.findById("discussion-123")).thenReturn(Optional.of(discussionEntity));
+        when(discussionRepository.save(any())).thenReturn(discussionEntity);
+
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class))).thenAnswer(invocation -> realObjectMapper.convertValue(invocation.getArgument(0), Map.class));
+
+        // ✅ make mutable map to avoid UnsupportedOperationException
+        when(objectMapper.convertValue(any(DiscussionEntity.class), any(TypeReference.class))).thenReturn(new HashMap<>(Map.of("discussionId", "discussion-123", "title", "Updated Title")));
+
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("path");
+        when(cbServerProperties.getDiscussionEsDefaultPageSize()).thenReturn(10);
+        when(cbServerProperties.getDiscussionFeedRedisTtl()).thenReturn(3600L);
+        when(cbServerProperties.getFilterCriteriaForGlobalFeed()).thenReturn("{\"requestedFields\":[],\"filterCriteriaMap\":{}}");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+        when(objectMapper.readValue(anyString(), eq(SearchCriteria.class))).thenReturn(new SearchCriteria());
+
+        // ✅ Return SearchResult with non-null documents
+        SearchResult fakeResult = new SearchResult();
+        fakeResult.setData(new ArrayList<>()); // empty list, avoids NPE
+        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(fakeResult);
+
+        ApiResponse response = discussionService.updateDiscussion(updateData, token);
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+    }
+
+    @Test
+    void testUpdateDiscussion_success_withNewlyAddedUsers() throws JsonProcessingException {
+        ObjectNode updateData = realObjectMapper.createObjectNode();
+        updateData.put(Constants.DISCUSSION_ID, "discussion-123");
+        updateData.put(Constants.COMMUNITY_ID, "community-1");
+        updateData.put("title", "Updated Title");
+
+        ArrayNode mentionedUsers = realObjectMapper.createArrayNode();
+        ObjectNode user1 = realObjectMapper.createObjectNode();
+        user1.put(Constants.USER_ID_RQST, "new-user-1");
+        mentionedUsers.add(user1);
+        updateData.set(Constants.MENTIONED_USERS, mentionedUsers);
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(discussionRepository.findById("discussion-123")).thenReturn(Optional.of(discussionEntity));
+        when(discussionRepository.save(any())).thenReturn(discussionEntity);
+
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class))).thenAnswer(invocation -> realObjectMapper.convertValue(invocation.getArgument(0), Map.class));
+
+        // ✅ Return mutable map instead of Map.of()
+        when(objectMapper.convertValue(any(DiscussionEntity.class), any(TypeReference.class))).thenReturn(new HashMap<>(Map.of("discussionId", "discussion-123", "title", "Updated Title")));
+
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("path");
+        when(cbServerProperties.getFilterCriteriaForGlobalFeed()).thenReturn("{\"requestedFields\":[],\"filterCriteriaMap\":{}}");
+        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(new SearchResult());
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+        when(cbServerProperties.getDiscussionEsDefaultPageSize()).thenReturn(10);
+        when(objectMapper.readValue(anyString(), eq(SearchCriteria.class))).thenReturn(new SearchCriteria());
+
+        ApiResponse response = discussionService.updateDiscussion(updateData, token);
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+    }
+
+    @Test
+    void testCreateAnswerPost_withMentionedUsers_andNotifications() throws Exception {
+        // ---------- Arrange ----------
+        String discussionOwner = "owner-456";
+
+        ObjectMapper realMapper = new ObjectMapper();
+        ObjectNode answerPostData = realMapper.createObjectNode();
+        answerPostData.put(Constants.PARENT_DISCUSSION_ID, "parent-discussion-id");
+        answerPostData.put(Constants.COMMUNITY_ID, "community-1");
+        answerPostData.put(CREATED_BY, userId);
+
+        // MENTIONED_USERS array
+        ArrayNode mentionedUsersArray = realMapper.createArrayNode();
+        mentionedUsersArray.add(realMapper.createObjectNode().put(USER_ID_RQST, "user-999"));
+        mentionedUsersArray.add(realMapper.createObjectNode().put(USER_ID_RQST, "user-888"));
+        answerPostData.set(MENTIONED_USERS, mentionedUsersArray);
+
+        // Mock token validation
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+
+        // Mock DiscussionEntity
+        ObjectNode discussionData = realMapper.createObjectNode();
+        discussionData.put(Constants.TYPE, Constants.QUESTION); // not ANSWER_POST
+        discussionData.put(Constants.STATUS, Constants.ACTIVE);
+        discussionData.put(Constants.COMMUNITY_ID, "community-1");
+        discussionData.put(Constants.CREATED_BY, discussionOwner);
+
+        discussionEntity = new DiscussionEntity();
+        discussionEntity.setData(discussionData);
+        discussionEntity.setIsActive(true);
+        when(discussionRepository.findById(anyString())).thenReturn(Optional.of(discussionEntity));
+
+        // Mock Cassandra community check
+        Map<String, Object> mockCommunityMap = new HashMap<>();
+        mockCommunityMap.put(Constants.STATUS, true);
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                any(), any(), any(), any(), any()))
+                .thenReturn(List.of(mockCommunityMap));
+
+        // Mock repository save - CRITICAL MISSING MOCK
+        DiscussionEntity savedEntity = new DiscussionEntity();
+        savedEntity.setDiscussionId("saved-answer-post-id");
+        savedEntity.setIsActive(true);
+        savedEntity.setData(answerPostData);
+        when(discussionRepository.save(any(DiscussionEntity.class))).thenReturn(savedEntity);
+
+        // Mock ObjectMapper operations - CRITICAL MISSING MOCKS
+        when(objectMapper.createArrayNode()).thenAnswer(invocation -> realMapper.createArrayNode());
+        when(objectMapper.createObjectNode()).thenAnswer(invocation -> realMapper.createObjectNode());
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class)))
+                .thenAnswer(invocation -> realMapper.convertValue(invocation.getArgument(0), Map.class));
+
+        // Mock cbServerProperties - CRITICAL MISSING MOCKS
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion_entity");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("/discussion/path");
+        when(cbServerProperties.getCommunityPostCount()).thenReturn("community_post_count");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("detect_language_topic");
+
+        // Mock helperMethodService
+        when(helperMethodService.fetchUserFirstName(anyString())).thenReturn("John");
+
+        String mockCriteriaJson = "{\"filterCriteriaMap\":{\"communityId\":[\"comm-1\"]}}";
+
+        // Mock cbServerProperties to return JSON string
+        Mockito.when(cbServerProperties.getFilterCriteriaForGlobalFeed())
+                .thenReturn(mockCriteriaJson);
+
+        // Mock ObjectMapper to return SearchCriteria object
+        SearchCriteria mockSearchCriteria = new SearchCriteria();
+        Map<String, Object> filterCriteriaMap = new HashMap<>();
+        filterCriteriaMap.put(Constants.COMMUNITY_ID, new HashSet<>(Set.of("comm-1")));
+        mockSearchCriteria.setFilterCriteriaMap((HashMap<String, Object>) filterCriteriaMap);
+
+        Mockito.when(objectMapper.readValue(Mockito.anyString(), Mockito.eq(SearchCriteria.class)))
+                .thenReturn(mockSearchCriteria);
+
+
+        // ---------- Act ----------
+        ApiResponse response = discussionService.createAnswerPost(answerPostData, token);
+
+        // ---------- Assert ----------
+        assertEquals(HttpStatus.CREATED, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+        assertNotNull(response.getResult());
+
+        // Verify notifications were triggered
+        verify(notificationTriggerService).triggerNotification(
+                eq(LIKED_COMMENT),
+                eq(ENGAGEMENT),
+                eq(List.of(discussionOwner)),
+                eq(TITLE),
+                eq("John"),
+                anyMap()
+        );
+        verify(notificationTriggerService).triggerNotification(
+                eq(TAGGED_COMMENT),
+                eq(ENGAGEMENT),
+                argThat(list -> list.contains("user-999") && list.contains("user-888")),
+                eq(TITLE),
+                eq("John"),
+                anyMap()
+        );
     }
 
 }

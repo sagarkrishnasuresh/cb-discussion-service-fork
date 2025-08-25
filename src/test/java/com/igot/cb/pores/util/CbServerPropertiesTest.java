@@ -77,4 +77,27 @@ class CbServerPropertiesTest {
         assertEquals("questionUserFeed", properties.getFilterCriteriaQuestionUserFeed());
         assertEquals(20, properties.getUserFeedFilterCriteriaMapSize());
     }
+
+    @Test
+    void testGettersAndSetters() {
+        CbServerProperties props = new CbServerProperties();
+
+        props.setKafkaUserPostCount("user-post-topic");
+        props.setCbServiceRegistryBaseUrl("http://localhost:8080");
+        props.setCbRegistryTextModerationApiPath("/text/moderation");
+        props.setCbDiscussionApiKey("dummy-key");
+        props.setContentModerationLanguageDetectApiPath("/lang/detect");
+        props.setKafkaProcessDetectLanguageTopic("detect-language-topic");
+        props.setKafkaGroupProcessDetectLanguageGroup("detect-language-group");
+        props.setContentModerationServiceUrl("http://content-service");
+
+        assertEquals("user-post-topic", props.getKafkaUserPostCount());
+        assertEquals("http://localhost:8080", props.getCbServiceRegistryBaseUrl());
+        assertEquals("/text/moderation", props.getCbRegistryTextModerationApiPath());
+        assertEquals("dummy-key", props.getCbDiscussionApiKey());
+        assertEquals("/lang/detect", props.getContentModerationLanguageDetectApiPath());
+        assertEquals("detect-language-topic", props.getKafkaProcessDetectLanguageTopic());
+        assertEquals("detect-language-group", props.getKafkaGroupProcessDetectLanguageGroup());
+        assertEquals("http://content-service", props.getContentModerationServiceUrl());
+    }
 }

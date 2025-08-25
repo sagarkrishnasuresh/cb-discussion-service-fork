@@ -40,16 +40,18 @@ class KeyManagerTest {
     @Mock
     private PropertiesCache propertiesCache;
 
-    private static final String TEST_PUBLIC_KEY = 
-            "-----BEGIN PUBLIC KEY-----\n" +
-            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqt2oHJWMKEwO1KnMQbqx\n" +
-            "id+wC/pUYT6uBKnJ6nrRlKFAuZCHVl7ULYyFGI/Cx2BHlzQxZZ6Auc5uMI5yQQu4\n" +
-            "Iml9QUXjpUlaFvZ7WnIj1Uhu2+4CVovMJAo3JCQtMULp2QhpN8UQ9EFhIyTUxJk3\n" +
-            "Yf1hgqNVRxKGzLKFJLYa+GXI+GUo0RL8SqJFLR8tVA+FGgAKV1YRvNrwwWXEZzMg\n" +
-            "XCYwNAhxZLWPpdA5Kl0/YKk9HgqKKvZXG+2AaWZGFJm6DV4Z4Q3uCeSvjhwNGqZ9\n" +
-            "TtDRQeHjQqKmGv19m+qYh1mSPEBQQGBgITUKfmPSxpnXOaQdY8qEPQQMJq7jXuP9\n" +
-            "twIDAQAB\n" +
-            "-----END PUBLIC KEY-----";
+    private static final String TEST_PUBLIC_KEY = """
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqt2oHJWMKEwO1KnMQbqx
+        id+wC/pUYT6uBKnJ6nrRlKFAuZCHVl7ULYyFGI/Cx2BHlzQxZZ6Auc5uMI5yQQu4
+        Iml9QUXjpUlaFvZ7WnIj1Uhu2+4CVovMJAo3JCQtMULp2QhpN8UQ9EFhIyTUxJk3
+        Yf1hgqNVRxKGzLKFJLYa+GXI+GUo0RL8SqJFLR8tVA+FGgAKV1YRvNrwwWXEZzMg
+        XCYwNAhxZLWPpdA5Kl0/YKk9HgqKKvZXG+2AaWZGFJm6DV4Z4Q3uCeSvjhwNGqZ9
+        TtDRQeHjQqKmGv19m+qYh1mSPEBQQGBgITUKfmPSxpnXOaQdY8qEPQQMJq7jXuP9
+        twIDAQAB
+        -----END PUBLIC KEY-----
+        """;
+
 
     private static final String TEST_KEY_ID = "test_key.pem";
     private static final String TEST_BASE_PATH = "/tmp/test_keys";
@@ -73,12 +75,9 @@ class KeyManagerTest {
     }
 
     @Test
-    void testInit_SuccessfulKeyLoading() throws Exception {
+    void testInit_SuccessfulKeyLoading() {
         // Create a mock Path for the test key file
         Path mockKeyPath = mock(Path.class);
-        // Path mockFileName = mock(Path.class);
-        // when(mockKeyPath.getFileName()).thenReturn(mockFileName);
-        // when(mockFileName.toString()).thenReturn(TEST_KEY_ID);
         
         // Mock the Files.walk method
         try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
@@ -120,7 +119,7 @@ class KeyManagerTest {
     }
 
     @Test
-    void testInit_ExceptionDuringFileReading() throws Exception {
+    void testInit_ExceptionDuringFileReading(){
         // Create a mock Path for the test key file
         Path mockKeyPath = mock(Path.class);
         Path mockFileName = mock(Path.class);
@@ -160,7 +159,7 @@ class KeyManagerTest {
     }
 
     @Test
-    void testInit_ExceptionDuringWalk() throws Exception {
+    void testInit_ExceptionDuringWalk(){
         // Mock the Files.walk method to throw an exception
         try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
              MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class);
@@ -255,7 +254,7 @@ class KeyManagerTest {
     }
 
     @Test
-    void init_shouldHandleExceptionWhenFilesWalkThrows() throws Exception {
+    void init_shouldHandleExceptionWhenFilesWalkThrows() {
         try (MockedStatic<Files> filesMockedStatic = Mockito.mockStatic(Files.class)) {
             // Make Files.walk throw exception
             filesMockedStatic.when(() -> Files.walk(any(Path.class))).thenThrow(new RuntimeException("Walk failed"));

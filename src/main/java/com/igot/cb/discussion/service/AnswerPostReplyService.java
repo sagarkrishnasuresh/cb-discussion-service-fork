@@ -1,6 +1,8 @@
 package com.igot.cb.discussion.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.igot.cb.discussion.entity.DiscussionEntity;
+import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.util.ApiResponse;
 import org.springframework.stereotype.Service;
 
@@ -21,4 +23,10 @@ public interface AnswerPostReplyService {
     ApiResponse getReportStatistics(Map<String, Object> reportData);
 
     ApiResponse migrateRecentReportedTime();
+
+    SearchCriteria createDefaultSearchCriteria(String parentAnswerPostId, String communityId);
+
+    SearchCriteria createSearchCriteriaWithDefaults(String parentDiscussionId, String communityId, String type);
+
+    void updateAnswerPostReplyToAnswerPost(DiscussionEntity discussionEntity, String discussionId, String action);
 }

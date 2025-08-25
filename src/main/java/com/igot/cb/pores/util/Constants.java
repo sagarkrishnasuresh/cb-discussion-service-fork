@@ -268,6 +268,32 @@ public class Constants {
     public static final String TAGGED_POST = "TAGGED_POST";
     public static final String ALERT = "ALERT";
     public static final String MENTIONED_USERS = "mentionedUsers";
+    public static final String FETCH_RESULT_CONSTANT = ".fetchResult:";
+    public static final String URI_CONSTANT = "URI: ";
+    public static final String TEXT = "text";
+    public static final String LANGUAGE = "language";
+    public static final String POST_ID = "post_id";
+    public static final String METADATA = "metadata";
+    public static final String CONTENT_TYPE = "content-type";
+    public static final String APPLICATION_JSON = "application/json";
+    public static final String AUTHORIZATION = "Authorization";
+    public static final String HEADER_MAP = "headerMap";
+    public static final String REQUEST_BODY = "requestBody";
+    public static final String SERVICE_CODE = "serviceCode";
+    public static final String PROFANITY_CHECK = "PROFANITY_CHECK";
+    public static final String LANGUAGE_CODE = "languageCode";
+    public static final String REQUEST_DATA = "request_data";
+    public static final String RESPONSE_DATA = "response_data";
+    public static final String RESPONSE_DATA_PATH = "responseData";
+    public static final String IS_PROFANE = "isProfane";
+    public static final String PROFANITY_RESPONSE = "profanityresponse";
+    public static final String DETECTED_LANGUAGE = "detected_language";
+    public static final String LANGUAGE_NOT_DETECTED = "languageNotDetected";
+    public static final String PROFANITY_CHECK_CALL_FAILED = "profanityCheckCallFailed";
+    public static final String PROFANITY_CHECK_UPDATE_FAILED = "profanityCheckUpdateFailed";
+    public static final String PROFANITY_CHECK_PASSED = "profanityCheckPassed";
+    public static final String LANGUAGE_DETECTION_CALL_FAILED = "languageDetectionCallFailed";
+    public static final String FAILED_LOWERCASE = "failed";
 
     private Constants() {
     }

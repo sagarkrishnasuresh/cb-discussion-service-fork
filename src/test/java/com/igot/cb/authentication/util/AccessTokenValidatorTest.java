@@ -39,7 +39,6 @@ class AccessTokenValidatorTest {
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private String validToken;
     private String expiredToken;
     private String invalidSignatureToken;
     private String invalidIssuerToken;
@@ -48,7 +47,6 @@ class AccessTokenValidatorTest {
     void setUp() throws Exception {
         // Mock PropertiesCache.getInstance().getProperty(...) if needed
         // Generate tokens for different scenarios
-        validToken = generateToken("validUserId", Time.currentTime() + 1000, "expectedIssuer");
         expiredToken = generateToken("expiredUserId", Time.currentTime() - 1000, "expectedIssuer");
         invalidSignatureToken = generateToken("invalidSignatureUserId", Time.currentTime() + 1000, "expectedIssuer");
         invalidIssuerToken = generateToken("invalidIssuerUserId", Time.currentTime() + 1000, "invalidIssuer");
@@ -106,7 +104,7 @@ class AccessTokenValidatorTest {
     }
 
     @Test
-    void fetchUserIdFromAccessToken_validToken_returnsUserId() throws Exception {
+    void fetchUserIdFromAccessToken_validToken_returnsUserId() {
         String accessToken = "validToken";
         String expectedUserId = "user123";
 
@@ -119,7 +117,7 @@ class AccessTokenValidatorTest {
     }
 
     @Test
-    void fetchUserIdFromAccessToken_unauthorizedToken_returnsNull() throws Exception {
+    void fetchUserIdFromAccessToken_unauthorizedToken_returnsNull() {
         String accessToken = "unauthorizedToken";
 
         doReturn("UNAUTHORIZED").when(spyAccessTokenValidator).verifyUserToken(accessToken);
@@ -136,7 +134,7 @@ class AccessTokenValidatorTest {
     }
 
     @Test
-    void fetchUserIdFromAccessToken_exceptionThrown_returnsNull() throws Exception {
+    void fetchUserIdFromAccessToken_exceptionThrown_returnsNull() {
         String accessToken = "token";
 
         doThrow(new RuntimeException("some error")).when(spyAccessTokenValidator).verifyUserToken(accessToken);

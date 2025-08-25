@@ -51,7 +51,7 @@ class ApiMetricsControllerTest {
             ApiResponse response = controller.enableTracking();
 
             assertNotNull(response);
-            mockedTracker.verify(() -> ApiMetricsTracker.enableTracking());
+            mockedTracker.verify(ApiMetricsTracker::enableTracking);
         }
     }
 
@@ -67,7 +67,7 @@ class ApiMetricsControllerTest {
             ApiResponse response = controller.disableTracking();
 
             assertNotNull(response);
-            mockedTracker.verify(() -> ApiMetricsTracker.disableTracking());
+            mockedTracker.verify(ApiMetricsTracker::disableTracking);
         }
     }
 }

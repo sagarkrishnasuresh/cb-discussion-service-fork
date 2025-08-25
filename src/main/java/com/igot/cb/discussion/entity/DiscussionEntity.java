@@ -33,4 +33,22 @@ public class DiscussionEntity {
     private Timestamp createdOn;
 
     private Timestamp updatedOn;
+
+    @Type(JsonType.class)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode profanityresponse;
+
+    @Column(name = "isprofane")
+    private Boolean isProfane;
+
+    @Column(name = "profanitycheckstatus")
+    private String profanityCheckStatus;
+
+    public DiscussionEntity(String discussionId, JsonNode data, Boolean isActive, Timestamp createdOn, Timestamp updatedOn) {
+        this.discussionId = discussionId;
+        this.data = data;
+        this.isActive = isActive;
+        this.createdOn = createdOn;
+        this.updatedOn = updatedOn;
+    }
 }

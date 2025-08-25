@@ -9,6 +9,9 @@
     "description": {
       "type": "string"
     },
+    "language": {
+      "type": "string"
+    },
     "communityId": {
       "type": "string"
     },

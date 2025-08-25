@@ -26,7 +26,9 @@ import com.igot.cb.pores.elasticsearch.dto.SearchResult;
 import com.igot.cb.pores.elasticsearch.service.EsUtilService;
 import com.igot.cb.pores.util.*;
 import com.igot.cb.producer.Producer;
+import com.igot.cb.profanity.IProfanityCheckService;
 import com.igot.cb.transactional.cassandrautils.CassandraOperation;
+import com.igot.cb.transactional.service.RequestHandlerServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -92,6 +94,11 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Autowired
     private HelperMethodService helperMethodService;
 
+    @Autowired
+    private RequestHandlerServiceImpl requestHandlerService;
+
+    @Autowired
+    private IProfanityCheckService profanityCheckService;
 
     @PostConstruct
     public void init() {
@@ -165,17 +172,18 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNodeEntity.setIsActive(true);
             discussionDetailsNode.put(Constants.IS_ACTIVE, true);
             jsonNodeEntity.setData(discussionDetailsNode);
+            jsonNodeEntity.setIsProfane(false);
             long postgresTime = System.currentTimeMillis();
             DiscussionEntity saveJsonEntity = discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.INSERT, postgresTime);
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(discussionDetailsNode);
-            Map<String, Object> map = objectMapper.convertValue(discussionDetailsNode, Map.class);
-
+            Map<String, Object> discussionPostDetailsMap = objectMapper.convertValue(discussionDetailsNode, Map.class);
+            discussionPostDetailsMap.put(IS_PROFANE,false);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
-            response.setResult(map);
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), saveJsonEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            response.setResult(discussionPostDetailsMap);
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), saveJsonEntity.getDiscussionId(), discussionPostDetailsMap, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + saveJsonEntity.getDiscussionId(), jsonNode);
             deleteCacheByCommunity(Constants.DISCUSSION_CACHE_PREFIX + discussionDetails.get(Constants.COMMUNITY_ID).asText());
             deleteCacheByCommunity(Constants.DISCUSSION_POSTS_BY_USER + discussionDetails.get(Constants.COMMUNITY_ID).asText() + Constants.UNDER_SCORE + userId);
@@ -209,6 +217,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
             }
+            producer.push(cbServerProperties.getKafkaProcessDetectLanguageTopic(), discussionDetailsNode);
         } catch (Exception e) {
             log.error("Failed to create discussion: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_DISCUSSION, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -358,14 +367,16 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
 
             discussionDbData.setData(data);
+            discussionDbData.setIsProfane(false);
             long postgresInsertTime = System.currentTimeMillis();
             discussionRepository.save(discussionDbData);
             updateMetricsDbOperation(Constants.DISCUSSION_CREATE, Constants.POSTGRES, Constants.UPDATE_KEY, postgresInsertTime);
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(data);
 
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionDbData.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            Map<String, Object> discussionPostDetailsMap = objectMapper.convertValue(jsonNode, Map.class);
+            discussionPostDetailsMap.put(IS_PROFANE,false);
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionDbData.getDiscussionId(), discussionPostDetailsMap, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionDbData.getDiscussionId(), jsonNode);
             deleteCacheByCommunity(Constants.DISCUSSION_POSTS_BY_USER + data.get(Constants.COMMUNITY_ID).asText() + Constants.UNDER_SCORE + userId);
             if (data.has(Constants.CATEGORY_TYPE)
@@ -377,6 +388,10 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             Map<String, Object> responseMap = objectMapper.convertValue(discussionDbData, new TypeReference<Map<String, Object>>() {
             });
+            if (MapUtils.isNotEmpty(responseMap)) {
+                responseMap.remove(IS_PROFANE);
+                responseMap.remove(Constants.PROFANITY_RESPONSE);
+            }
             response.setResponseCode(HttpStatus.OK);
             response.setResult(responseMap);
             response.getParams().setStatus(Constants.SUCCESS);
@@ -402,6 +417,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
             }
+            producer.push(cbServerProperties.getKafkaProcessDetectLanguageTopic(), jsonNode);
         } catch (Exception e) {
             log.error("Failed to update the discussion: ", e);
             DiscussionServiceUtil.createErrorResponse(response, "Failed to update the discussion", HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -440,6 +456,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 searchCriteria.setFilterCriteriaMap(new HashMap<>());
             }
             searchCriteria.getFilterCriteriaMap().put(Constants.IS_ACTIVE, true);
+            searchCriteria.getFilterCriteriaMap().put(IS_PROFANE, false);
 
             if (!searchCriteria.getFilterCriteriaMap().containsKey(Constants.STATUS) ||
                     (!searchCriteria.getFilterCriteriaMap().get(Constants.STATUS).equals(Collections.singletonList(Constants.REPORTED)) &&
@@ -905,14 +922,16 @@ public class DiscussionServiceImpl implements DiscussionService {
             jsonNodeEntity.setData(answerPostDataNode);
             jsonNodeEntity.setCreatedOn(currentTime);
             jsonNodeEntity.setUpdatedOn(currentTime);
+            jsonNodeEntity.setIsProfane(false);
             long timer = System.currentTimeMillis();
             discussionRepository.save(jsonNodeEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.INSERT, timer);
 
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(answerPostDataNode);
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            Map<String, Object> discussionAnswerPostDetailsMap = objectMapper.convertValue(jsonNode, Map.class);
+            discussionAnswerPostDetailsMap.put(IS_PROFANE,false);
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), String.valueOf(id), discussionAnswerPostDetailsMap, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(id), jsonNode);
 
             updateAnswerPostToDiscussion(discussionEntity, String.valueOf(id), Constants.INCREMENT);
@@ -960,10 +979,11 @@ public class DiscussionServiceImpl implements DiscussionService {
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
             }
-            map.put(Constants.CREATED_ON, currentTime);
+            discussionAnswerPostDetailsMap.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
-            response.setResult(map);
+            response.setResult(discussionAnswerPostDetailsMap);
+            producer.push(cbServerProperties.getKafkaProcessDetectLanguageTopic(), answerPostDataNode);
         } catch (Exception e) {
             log.error("Failed to create AnswerPost: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_ANSWER_POST, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -972,7 +992,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         return response;
     }
 
-    private SearchCriteria createSearchCriteriaWithDefaults(String parentDiscussionId,
+    public SearchCriteria createSearchCriteriaWithDefaults(String parentDiscussionId,
                                                             String communityId,
                                                             String type) {
         SearchCriteria criteria = new SearchCriteria();
@@ -1000,7 +1020,7 @@ public class DiscussionServiceImpl implements DiscussionService {
 
     }
 
-    private void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId, String action) {
+    public void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId, String action) {
         log.info("DiscussionService::updateAnswerPostToDiscussion:inside");
         JsonNode data = discussionEntity.getData();
         Set<String> answerPostSet = new HashSet<>();
@@ -1025,7 +1045,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) savedEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-
+        map.put(IS_PROFANE, Boolean.TRUE.equals(discussionEntity.getIsProfane()));
         esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
     }
@@ -1373,14 +1393,18 @@ public class DiscussionServiceImpl implements DiscussionService {
             }
             data.setAll(answerPostDataNode);
             discussionEntity.setData(data);
+            discussionEntity.setIsProfane(false);
             long timer = System.currentTimeMillis();
             discussionRepository.save(discussionEntity);
             updateMetricsDbOperation(Constants.DISCUSSION_ANSWER_POST, Constants.POSTGRES, Constants.UPDATE, timer);
 
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(data);
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            Map<String, Object> discussionAnswerPostDetailMap = objectMapper.convertValue(jsonNode, Map.class);
+            if(MapUtils.isNotEmpty(discussionAnswerPostDetailMap)) {
+                discussionAnswerPostDetailMap.put(IS_PROFANE, false);
+            }
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionEntity.getDiscussionId(), discussionAnswerPostDetailMap, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + String.valueOf(discussionEntity.getDiscussionId()), jsonNode);
             redisTemplate.opsForValue()
                     .getAndDelete(DiscussionServiceUtil.generateRedisJwtTokenKey(createSearchCriteriaWithDefaults(
@@ -1400,9 +1424,14 @@ public class DiscussionServiceImpl implements DiscussionService {
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
             }
+            if(MapUtils.isNotEmpty(discussionAnswerPostDetailMap)) {
+                discussionAnswerPostDetailMap.remove(IS_PROFANE);
+                discussionAnswerPostDetailMap.remove(Constants.PROFANITY_RESPONSE);
+            }
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);
-            response.setResult(map);
+            response.setResult(discussionAnswerPostDetailMap);
+            producer.push(cbServerProperties.getKafkaProcessDetectLanguageTopic(), jsonNode);
         } catch (Exception e) {
             log.error("Failed to update AnswerPost: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_UPDATE_ANSWER_POST, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -1550,7 +1579,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             searchCriteria.setPageSize((int) requestData.get(Constants.PAGE_SIZE));
             searchCriteria.setOrderDirection(Constants.DESC);
             searchCriteria.setOrderBy(Constants.CREATED_ON);
-
+            searchCriteria.getFilterCriteriaMap().put(IS_PROFANE, false);
             if (requestData.containsKey(Constants.SEARCH_STRING) && StringUtils.isNotBlank((String) requestData.get(Constants.SEARCH_STRING))) {
                 if (((String) requestData.get(Constants.SEARCH_STRING)).length() < 3) {
                     DiscussionServiceUtil.createErrorResponse(response, Constants.MINIMUM_CHARACTERS_NEEDED, HttpStatus.BAD_REQUEST, Constants.FAILED_CONST);
@@ -1702,7 +1731,7 @@ public class DiscussionServiceImpl implements DiscussionService {
             filterCriteria.put(Constants.TYPE, Constants.QUESTION);
             filterCriteria.put(Constants.STATUS, Arrays.asList(Constants.ACTIVE, Constants.REPORTED));
             filterCriteria.put(Constants.IS_ACTIVE, true);
-
+            filterCriteria.put(IS_PROFANE, false);
             searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
             searchResult = esUtilService.searchDocuments(cbServerProperties.getDiscussionEntity(), searchCriteria, cbServerProperties.getElasticDiscussionJsonPath());
             List<Map<String, Object>> discussions = searchResult.getData();
@@ -1755,7 +1784,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         return errorMsg.toString();
     }
 
-    private void deleteCacheByCommunity(String prefix) {
+    public void deleteCacheByCommunity(String prefix) {
         String pattern = prefix + "_*";
         Set<String> keys = redisTemplate.keys(pattern);
         if (!keys.isEmpty()) {
@@ -1766,7 +1795,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
     }
 
-    private void updateCacheForFirstFivePages(String communityId, boolean isDocumentType) {
+    public void updateCacheForFirstFivePages(String communityId, boolean isDocumentType) {
         SearchCriteria searchCriteria = getCriteria(0, 5 * cbServerProperties.getDiscussionEsDefaultPageSize());
         Map<String, Object> filterCriteria = new HashMap<>();
         filterCriteria.put(Constants.COMMUNITY_ID, communityId);
@@ -1776,6 +1805,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         }
         filterCriteria.put(Constants.STATUS, Arrays.asList(Constants.ACTIVE, Constants.REPORTED));
         filterCriteria.put(Constants.IS_ACTIVE, true);
+        filterCriteria.put(IS_PROFANE, false);
         searchCriteria.getFilterCriteriaMap().putAll(filterCriteria);
 
         try {
@@ -2227,6 +2257,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         searchCriteria.setFilterCriteriaMap(new HashMap<>());
         searchCriteria.setRequestedFields(Arrays.asList(Constants.COMMUNITY_ID));
         searchCriteria.getFilterCriteriaMap().put(Constants.STATUS, Constants.ACTIVE);
+        searchCriteria.getFilterCriteriaMap().put(IS_PROFANE, false);
         searchCriteria.setOrderBy(Constants.COUNT_OF_ANSWER_POST_COUNT);
         searchCriteria.setOrderDirection(Constants.DESC);
         searchCriteria.setPageNumber(0);
@@ -2264,5 +2295,6 @@ public class DiscussionServiceImpl implements DiscussionService {
         criteria.setFacets(Collections.emptyList());
         return criteria;
     }
+
 
 }

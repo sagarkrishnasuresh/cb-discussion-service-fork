@@ -64,6 +64,9 @@
         },
         "required": ["userId", "userName"]
       }
+    },
+    "language": {
+      "type": "string"
     }
   },
   "required": [

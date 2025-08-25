@@ -3,7 +3,6 @@ package com.igot.cb.discussion.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.igot.cb.discussion.controller.DiscussionController;
 import com.igot.cb.discussion.service.AnswerPostReplyService;
 import com.igot.cb.discussion.service.DiscussionService;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;

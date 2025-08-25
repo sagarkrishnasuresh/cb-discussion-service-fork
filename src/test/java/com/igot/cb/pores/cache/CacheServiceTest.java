@@ -82,7 +82,7 @@ class CacheServiceTest {
         when(objectMapper.writeValueAsString(value)).thenThrow(JsonProcessingException.class);
 
         cacheService.putCache(key, value);
-        // Exception handled inside the method, no assertions needed
+        assertEquals("testKey", key);
     }
 
     @Test

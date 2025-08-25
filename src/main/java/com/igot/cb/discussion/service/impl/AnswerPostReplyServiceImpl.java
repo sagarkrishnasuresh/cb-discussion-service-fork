@@ -12,7 +12,6 @@ import com.igot.cb.discussion.entity.DiscussionEntity;
 import com.igot.cb.discussion.repository.DiscussionAnswerPostReplyRepository;
 import com.igot.cb.discussion.repository.DiscussionRepository;
 import com.igot.cb.discussion.service.AnswerPostReplyService;
-import com.igot.cb.discussion.service.DiscussionService;
 import com.igot.cb.notificationUtill.HelperMethodService;
 import com.igot.cb.notificationUtill.NotificationTriggerService;
 import com.igot.cb.pores.cache.CacheService;
@@ -20,6 +19,8 @@ import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.elasticsearch.dto.SearchResult;
 import com.igot.cb.pores.elasticsearch.service.EsUtilService;
 import com.igot.cb.pores.util.*;
+import com.igot.cb.producer.Producer;
+import com.igot.cb.profanity.IProfanityCheckService;
 import com.igot.cb.transactional.cassandrautils.CassandraOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -36,7 +37,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.igot.cb.pores.util.Constants.*;
 
@@ -70,6 +70,12 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
     @Autowired
     @Qualifier(Constants.SEARCH_RESULT_REDIS_TEMPLATE)
     private RedisTemplate<String, SearchResult> redisTemplate;
+
+    @Autowired
+    private IProfanityCheckService profanityCheckService;
+
+    @Autowired
+    private Producer producer;
 
     @Override
     public ApiResponse createAnswerPostReply(JsonNode answerPostDataReplyData, String token) {
@@ -144,12 +150,14 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             jsonNodeEntity.setData(answerPostReplyDataNode);
             jsonNodeEntity.setCreatedOn(currentTime);
             jsonNodeEntity.setUpdatedOn(currentTime);
+            jsonNodeEntity.setIsProfane(false);
             discussionAnswerPostReplyRepository.save(jsonNodeEntity);
 
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(answerPostReplyDataNode);
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), String.valueOf(id), map, cbServerProperties.getElasticDiscussionJsonPath());
+            Map<String, Object> discussionAnswerPostReplyDetailsMap = objectMapper.convertValue(jsonNode, Map.class);
+            discussionAnswerPostReplyDetailsMap.put(Constants.IS_PROFANE, false);
+            esUtilService.addDocument(cbServerProperties.getDiscussionEntity(), String.valueOf(id), discussionAnswerPostReplyDetailsMap, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + id, jsonNode);
             updateAnswerPostReplyToAnswerPost(discussionEntity, String.valueOf(id), Constants.INCREMENT);
             redisTemplate.opsForValue()
@@ -162,10 +170,10 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                             answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
                             Constants.ANSWER_POST)));
             log.info("AnswerPostReply post created successfully");
-            map.put(Constants.CREATED_ON, currentTime);
+            discussionAnswerPostReplyDetailsMap.put(Constants.CREATED_ON, currentTime);
             response.setResponseCode(HttpStatus.CREATED);
             response.getParams().setStatus(Constants.SUCCESS);
-            response.setResult(map);
+            response.setResult(discussionAnswerPostReplyDetailsMap);
             try {
                 Map<String, Object> notificationData = Map.of(
                         Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
@@ -194,6 +202,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             } catch (Exception e) {
                 log.error("Error while triggering notification", e);
             }
+            producer.push(cbServerProperties.getKafkaProcessDetectLanguageTopic(), answerPostReplyDataNode);
         } catch (Exception e) {
             log.error("Failed to create AnswerPost: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_CREATE_ANSWER_POST_REPLY, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -202,7 +211,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         return response;
     }
 
-    private SearchCriteria createDefaultSearchCriteria(String parentAnswerPostId,
+    public SearchCriteria createDefaultSearchCriteria(String parentAnswerPostId,
                                                        String communityId) {
         SearchCriteria criteria = new SearchCriteria();
         HashMap<String, Object> filterMap = new HashMap<>();
@@ -219,7 +228,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         return criteria;
     }
 
-    private void updateAnswerPostReplyToAnswerPost(DiscussionEntity discussionEntity, String discussionId, String action) {
+    public void updateAnswerPostReplyToAnswerPost(DiscussionEntity discussionEntity, String discussionId, String action) {
         log.info("DiscussionService::updateAnswerPostReplyToAnswerPost:inside");
         JsonNode data = discussionEntity.getData();
         Set<String> answerPostReplies = new HashSet<>();
@@ -244,6 +253,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         ObjectNode jsonNode = objectMapper.createObjectNode();
         jsonNode.setAll((ObjectNode) savedEntity.getData());
         Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+        map.put(IS_PROFANE, Boolean.TRUE.equals(discussionEntity.getIsProfane()));
         esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
         cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionEntity.getDiscussionId(), jsonNode);
     }
@@ -417,12 +427,14 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             }
             data.setAll(answerPostReplyDataNode);
             discussionAnswerPostReplyEntity.setData(data);
+            discussionAnswerPostReplyEntity.setIsProfane(false);
             discussionAnswerPostReplyRepository.save(discussionAnswerPostReplyEntity);
 
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.setAll(data);
-            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
-            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionAnswerPostReplyEntity.getDiscussionId(), map, cbServerProperties.getElasticDiscussionJsonPath());
+            Map<String, Object> discussionAnswerPostReplyDetailsMap = objectMapper.convertValue(jsonNode, Map.class);
+            discussionAnswerPostReplyDetailsMap.put(Constants.IS_PROFANE, false);
+            esUtilService.updateDocument(cbServerProperties.getDiscussionEntity(), discussionAnswerPostReplyEntity.getDiscussionId(), discussionAnswerPostReplyDetailsMap, cbServerProperties.getElasticDiscussionJsonPath());
             cacheService.putCache(Constants.DISCUSSION_CACHE_PREFIX + discussionAnswerPostReplyEntity.getDiscussionId(), jsonNode);
             redisTemplate.opsForValue()
                     .getAndDelete(DiscussionServiceUtil.generateRedisJwtTokenKey(createDefaultSearchCriteria(
@@ -441,9 +453,12 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
             } catch (Exception e) {
                 log.error("Error while triggering notification for update answerPostReply", e);
             }
+            discussionAnswerPostReplyDetailsMap.remove(IS_PROFANE);
+            discussionAnswerPostReplyDetailsMap.remove(Constants.PROFANITY_RESPONSE);
             response.setResponseCode(HttpStatus.OK);
             response.getParams().setStatus(Constants.SUCCESS);
-            response.setResult(map);
+            response.setResult(discussionAnswerPostReplyDetailsMap);
+            producer.push(cbServerProperties.getKafkaProcessDetectLanguageTopic(), jsonNode);
         } catch (Exception e) {
             log.error("Failed to update AnswerPost: {}", e.getMessage(), e);
             DiscussionServiceUtil.createErrorResponse(response, Constants.FAILED_TO_UPDATE_ANSWER_POST, HttpStatus.INTERNAL_SERVER_ERROR, Constants.FAILED);
@@ -452,7 +467,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
         return response;
     }
 
-    private SearchCriteria createSearchCriteriaWithDefaults(String parentDiscussionId,
+    public SearchCriteria createSearchCriteriaWithDefaults(String parentDiscussionId,
                                                             String communityId,
                                                             String type) {
         SearchCriteria criteria = new SearchCriteria();

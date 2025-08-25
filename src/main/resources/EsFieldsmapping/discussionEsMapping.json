@@ -103,5 +103,8 @@
         "type": "keyword"
       }
     }
+  },
+  "isProfane": {
+    "type": "boolean"
   }
 }

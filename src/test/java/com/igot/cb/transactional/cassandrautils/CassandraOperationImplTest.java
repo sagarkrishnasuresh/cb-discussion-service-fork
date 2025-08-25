@@ -112,10 +112,10 @@ class CassandraOperationImplTest {
 
         try (MockedStatic<CassandraUtil> cassandraUtilMockedStatic = Mockito.mockStatic(CassandraUtil.class)) {
             List<Map<String, Object>> expectedResponse = new ArrayList<>();
-            Map<String, Object> record = new HashMap<>();
-            record.put("id", "123");
-            record.put("name", "Test");
-            expectedResponse.add(record);
+            Map<String, Object> localRecord = new HashMap<>();
+            localRecord.put("id", "123");
+            localRecord.put("name", "Test");
+            expectedResponse.add(localRecord);
 
             cassandraUtilMockedStatic.when(() -> CassandraUtil.createResponse(any(ResultSet.class)))
                     .thenReturn(expectedResponse);
@@ -141,10 +141,10 @@ class CassandraOperationImplTest {
 
         try (MockedStatic<CassandraUtil> cassandraUtilMockedStatic = Mockito.mockStatic(CassandraUtil.class)) {
             List<Map<String, Object>> expectedResponse = new ArrayList<>();
-            Map<String, Object> record = new HashMap<>();
-            record.put("id", "123");
-            record.put("name", "Test");
-            expectedResponse.add(record);
+            Map<String, Object> localRecord = new HashMap<>();
+            localRecord.put("id", "123");
+            localRecord.put("name", "Test");
+            expectedResponse.add(localRecord);
 
             cassandraUtilMockedStatic.when(() -> CassandraUtil.createResponse(any(ResultSet.class)))
                     .thenReturn(expectedResponse);
@@ -181,8 +181,8 @@ class CassandraOperationImplTest {
     @Test
     void updateRecord_Success() {
         // Arrange
-        String keyspaceName = "testKeyspace";
-        String tableName = "testTable";
+        String localKeyspaceName = "testKeyspace";
+        String localTableName = "testTable";
 
         // The request map should contain the ID (primary key) and fields to update
         Map<String, Object> request = new HashMap<>();
@@ -190,20 +190,20 @@ class CassandraOperationImplTest {
         request.put("name", "Updated Name");
         request.put("email", "updated@example.com");
 
-        PreparedStatement mockPreparedStatement = mock(PreparedStatement.class);
-        BoundStatement mockBoundStatement = mock(BoundStatement.class);
+        PreparedStatement localMockPreparedStatement = mock(PreparedStatement.class);
+        BoundStatement localMockBoundStatement = mock(BoundStatement.class);
 
-        when(connectionManager.getSession(keyspaceName)).thenReturn(mockSession);
-        when(mockSession.prepare(anyString())).thenReturn(mockPreparedStatement);
-        when(mockPreparedStatement.bind(any(Object[].class))).thenReturn(mockBoundStatement);
-        when(mockSession.execute(mockBoundStatement)).thenReturn(mockResultSet);
+        when(connectionManager.getSession(localKeyspaceName)).thenReturn(mockSession);
+        when(mockSession.prepare(anyString())).thenReturn(localMockPreparedStatement);
+        when(localMockPreparedStatement.bind(any(Object[].class))).thenReturn(localMockBoundStatement);
+        when(mockSession.execute(localMockBoundStatement)).thenReturn(mockResultSet);
 
         // Act
-        Map<String, Object> response = cassandraOperation.updateRecord(keyspaceName, tableName, request);
+        Map<String, Object> response = cassandraOperation.updateRecord(localKeyspaceName, localTableName, request);
 
         // Assert
         assertEquals(Constants.SUCCESS, response.get(Constants.RESPONSE));
-        verify(mockSession).execute(mockBoundStatement);
+        verify(mockSession).execute(localMockBoundStatement);
     }
 
     @Test
@@ -312,8 +312,8 @@ class CassandraOperationImplTest {
     @Test
     void testGetRecordsByPropertiesByKey_success() {
         // Input
-        String keyspaceName = "test_keyspace";
-        String tableName = "test_table";
+        String localKeyspaceName = "test_keyspace";
+        String localTableName = "test_table";
         Map<String, Object> propertyMap = Map.of("id", 1);
         List<String> fields = List.of("id", "name");
         String key = "id";
@@ -325,10 +325,7 @@ class CassandraOperationImplTest {
         Select mockSelect = mock(Select.class);
         when(mockSelect.build()).thenReturn(statement);
 
-//        doReturn(mockSelect).when(cassandraOperation)
-//                .processQuery(keyspaceName, tableName, propertyMap, fields);
-
-        when(connectionManager.getSession(keyspaceName)).thenReturn(mockSession);
+        when(connectionManager.getSession(localKeyspaceName)).thenReturn(mockSession);
         when(mockSession.execute(statement)).thenReturn(mockResultSet);
 
         try (MockedStatic<CassandraUtil> cassandraUtilMock = Mockito.mockStatic(CassandraUtil.class)) {
@@ -339,7 +336,7 @@ class CassandraOperationImplTest {
 
             // Call method
             List<Map<String, Object>> response = cassandraOperation.getRecordsByPropertiesByKey(
-                    keyspaceName, tableName, propertyMap, fields, key
+                    localKeyspaceName, localTableName, propertyMap, fields, key
             );
 
             // Assertions
@@ -350,8 +347,8 @@ class CassandraOperationImplTest {
     @Test
     void testGetRecordsByPropertiesByKey_exception() {
         // Prepare input
-        String keyspaceName = "test_keyspace";
-        String tableName = "test_table";
+        String localKeyspaceName = "test_keyspace";
+        String localTableName = "test_table";
         Map<String, Object> propertyMap = Map.of("id", 1);
         List<String> fields = List.of("id", "name");
         String key = "id";
@@ -361,7 +358,7 @@ class CassandraOperationImplTest {
 
         // Call method
         List<Map<String, Object>> response = cassandraOperation.getRecordsByPropertiesByKey(
-                keyspaceName, tableName, propertyMap, fields, key
+                localKeyspaceName, localTableName, propertyMap, fields, key
         );
 
         // Assert

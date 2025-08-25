@@ -33,4 +33,14 @@ public class DiscussionAnswerPostReplyEntity {
     private Timestamp createdOn;
 
     private Timestamp updatedOn;
+
+    @Type(JsonType.class)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode profanityresponse;
+
+    @Column(name = "isprofane")
+    private Boolean isProfane;
+
+    @Column(name = "profanitycheckstatus")
+    private String profanityCheckStatus;
 }

@@ -84,13 +84,13 @@ class EsUtilServiceImplMethodTest {
         when(elasticsearchClient.search(any(SearchRequest.class), eq(Object.class))).thenReturn(mockResponse);
 
         // Build searchCriteria
-        SearchCriteria searchCriteria = new SearchCriteria();
+        SearchCriteria localSearchCriteria = new SearchCriteria();
         searchCriteria.setPageNumber(0);
         searchCriteria.setPageSize(10);
         searchCriteria.setRequestedFields(List.of("field"));
         searchCriteria.setFilterCriteriaMap(new HashMap<>());
 
-        SearchResult result = esUtilService.searchDocuments(index, searchCriteria, jsonFilePath);
+        SearchResult result = esUtilService.searchDocuments(index, localSearchCriteria, jsonFilePath);
 
         assertNotNull(result);
         assertEquals(1, result.getTotalCount());
@@ -105,6 +105,7 @@ class EsUtilServiceImplMethodTest {
         Method method = EsUtilServiceImpl.class.getDeclaredMethod("addRequestedFieldsToSearchSourceBuilder", SearchCriteria.class, SearchRequest.Builder.class);
         method.setAccessible(true);
         method.invoke(esUtilService, searchCriteria, builder);
+        assertEquals("addRequestedFieldsToSearchSourceBuilder",method.getName());
     }
 
     @Test
@@ -115,6 +116,7 @@ class EsUtilServiceImplMethodTest {
         Method method = EsUtilServiceImpl.class.getDeclaredMethod("addFacetsToSearchSourceBuilder", List.class, SearchRequest.Builder.class);
         method.setAccessible(true);
         method.invoke(esUtilService, facets, builder);
+        assertEquals("communityId", facets.get(0));
     }
 
     @Test

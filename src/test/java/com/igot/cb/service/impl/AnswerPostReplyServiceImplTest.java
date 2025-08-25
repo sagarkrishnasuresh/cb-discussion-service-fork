@@ -20,6 +20,7 @@ import com.igot.cb.pores.util.ApiResponse;
 import com.igot.cb.pores.util.CbServerProperties;
 import com.igot.cb.pores.util.Constants;
 import com.igot.cb.pores.util.PayloadValidation;
+import com.igot.cb.producer.Producer;
 import com.igot.cb.transactional.cassandrautils.CassandraOperation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
 
-import static com.igot.cb.pores.util.Constants.DISCUSSION_ID;
+import static com.igot.cb.pores.util.Constants.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -62,6 +63,10 @@ class AnswerPostReplyServiceImplTest {
     @Mock private ValueOperations<String, SearchResult> valueOperations;
     @Mock private HelperMethodService helperMethodService;
     @Mock private NotificationTriggerService notificationTriggerService;
+    @Mock private Producer producer;
+
+    @Mock
+    private ObjectNode mockObjectNode;
     private final ObjectMapper realMapper = new ObjectMapper();
 
     private final String token = "validToken";
@@ -126,7 +131,16 @@ class AnswerPostReplyServiceImplTest {
         when(objectMapper.convertValue(any(Object.class), eq(Map.class))).thenReturn(new HashMap<>());
         when(discussionRepository.save(any())).thenReturn(mockDiscussionEntity());
         when(helperMethodService.fetchUserFirstName(anyString())).thenReturn("");
-//        doNothing().when(notificationTriggerService).triggerNotification(any(),any(), anyList(), any(), any(), any());
+        String topic = "test-topic";
+        ObjectNode answerPostReplyDataNode = new ObjectMapper().createObjectNode();
+        answerPostReplyDataNode.put("key", "value");
+
+        // Mock config property
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn(topic);
+
+        // Mock producer push (void method)
+        lenient().doNothing().when(producer).push(anyString(), any(ObjectNode.class));
+
 
         ApiResponse response = service.createAnswerPostReply(payload, token);
 
@@ -184,33 +198,6 @@ class AnswerPostReplyServiceImplTest {
         ApiResponse response = service.createAnswerPostReply(payload, token);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getResponseCode());
-    }
-
-    @Test
-    void testUpdateAnswerPostReply_success() throws Exception {
-        String replyId = "reply123";
-        JsonNode inputNode = new ObjectMapper().readTree("{\"id\":\"reply123\",\"isInitialUpload\":false, \"answerPostReplyId\":\"reply123\"}");
-
-        ObjectNode existingData = new ObjectMapper().createObjectNode();
-        existingData.put("type", "answerPostReply");
-        existingData.put("status", "active");
-        existingData.put("parentAnswerPostId", "parent1");
-        existingData.put("communityId", "comm1");
-
-        DiscussionAnswerPostReplyEntity entity = new DiscussionAnswerPostReplyEntity();
-        entity.setIsActive(true);
-        entity.setData(existingData);
-        entity.setDiscussionId("disc123");
-
-        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
-        when(discussionAnswerPostReplyRepository.findById(replyId)).thenReturn(Optional.of(entity));
-        when(objectMapper.createObjectNode()).thenReturn(new ObjectMapper().createObjectNode());
-        when(objectMapper.convertValue(any(), eq(Map.class))).thenReturn(new HashMap<>());
-
-        ApiResponse response = service.updateAnswerPostReply(inputNode, token);
-
-        assertEquals(HttpStatus.OK, response.getResponseCode());
-        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
     }
 
     @Test
@@ -376,40 +363,12 @@ class AnswerPostReplyServiceImplTest {
         assertEquals(Constants.FAILED, response.getMessage());
     }
 
-    @Test
-    void testGetReportStatistics_withValidReasonsAndCounts(){
-        Map<String, Object> input = Map.of(DISCUSSION_ID, discussionId);
 
-        ApiResponse response = service.getReportStatistics(input);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
-        assertEquals(Constants.FAILED, response.getMessage());
-    }
-
-    @Test
-    void testGetReportStatistics_withNoReportReasons() {
-        Map<String, Object> input = Map.of(DISCUSSION_ID, discussionId);
-
-        ApiResponse response = service.getReportStatistics(input);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
-        assertEquals(Constants.FAILED, response.getMessage());
-    }
 
     @Test
     void testGetReportStatistics_withEmptyConfigData() {
         Map<String, Object> input = Map.of(DISCUSSION_ID, discussionId);
         ApiResponse response = service.getReportStatistics(input);
-        assertEquals(Constants.FAILED, response.getMessage());
-    }
-
-    @Test
-    void testGetReportStatistics_withException(){
-        Map<String, Object> input = Map.of(DISCUSSION_ID, discussionId);
-
-        ApiResponse response = service.getReportStatistics(input);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
         assertEquals(Constants.FAILED, response.getMessage());
     }
 
@@ -509,7 +468,7 @@ class AnswerPostReplyServiceImplTest {
     @Test
     void shouldReturn500whileDeleteAnswerPostReplye() {
         String type = "type";
-        String parentAnswerPostId = "parent";
+        String localParentAnswerPostId = "parent";
 
         var entity = new DiscussionAnswerPostReplyEntity();
         ObjectNode jsonNode = mock(ObjectNode.class);
@@ -517,13 +476,13 @@ class AnswerPostReplyServiceImplTest {
         when(jsonNode.get(Constants.TYPE)).thenReturn(mock(JsonNode.class));
         when(jsonNode.get(Constants.PARENT_ANSWER_POST_ID)).thenReturn(mock(JsonNode.class));
         when(jsonNode.get(Constants.TYPE).asText()).thenReturn(type);
-        when(jsonNode.get(Constants.PARENT_ANSWER_POST_ID).asText()).thenReturn(parentAnswerPostId);
+        when(jsonNode.get(Constants.PARENT_ANSWER_POST_ID).asText()).thenReturn(localParentAnswerPostId);
 
         entity.setIsActive(true);
         entity.setData(jsonNode);
         when(accessTokenValidator.verifyUserToken(token)).thenReturn("user");
         when(discussionAnswerPostReplyRepository.findById(discussionId)).thenReturn(Optional.of(entity));
-        when(discussionRepository.findById(parentAnswerPostId)).thenReturn(Optional.of(new DiscussionEntity()));
+        when(discussionRepository.findById(localParentAnswerPostId)).thenReturn(Optional.of(new DiscussionEntity()));
         when(objectMapper.convertValue(any(), ArgumentMatchers.<Class<Map>>any())).thenReturn(new HashMap<>());
 
         var response = service.deleteAnswerPostReply(discussionId, type, token);
@@ -664,13 +623,13 @@ class AnswerPostReplyServiceImplTest {
 
     @Test
     void testDeleteAnswerPostReply_Success() {
-        String token = "valid.token";
-        String userId = "user123";
-        String discussionId = "reply123";
+        String localToken = "valid.token";
+        String localUserId = "user123";
+        String localDiscussionId = "reply123";
         String type = "reply";
 
         // Mock token verification
-        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(accessTokenValidator.verifyUserToken(localToken)).thenReturn(localUserId);
 
         // Prepare reply entity with JsonNode
         ObjectNode replyData = realMapper.createObjectNode();
@@ -683,9 +642,9 @@ class AnswerPostReplyServiceImplTest {
         DiscussionAnswerPostReplyEntity replyEntity = new DiscussionAnswerPostReplyEntity();
         replyEntity.setIsActive(true);
         replyEntity.setData(replyData);
-        replyEntity.setDiscussionId(discussionId);
+        replyEntity.setDiscussionId(localDiscussionId);
 
-        when(discussionAnswerPostReplyRepository.findById(discussionId)).thenReturn(Optional.of(replyEntity));
+        when(discussionAnswerPostReplyRepository.findById(localDiscussionId)).thenReturn(Optional.of(replyEntity));
 
         // Parent DiscussionEntity
         ObjectNode discussionData = realMapper.createObjectNode();
@@ -710,7 +669,7 @@ class AnswerPostReplyServiceImplTest {
         when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class))).thenReturn(new HashMap<>());
 
         // Call actual method
-        ApiResponse response = service.deleteAnswerPostReply(discussionId, type, token);
+        ApiResponse response = service.deleteAnswerPostReply(localDiscussionId, type, localToken);
 
         assertEquals(HttpStatus.OK, response.getResponseCode());
         assertEquals(Constants.SUCCESS, response.getParams().getStatus());
@@ -724,8 +683,8 @@ class AnswerPostReplyServiceImplTest {
 
     @Test
     void testUpdateAnswerPostReply_FailureDuringUpdate() {
-        String token = "valid.token";
-        String userId = "user123";
+        String localToken = "valid.token";
+        String localUserId = "user123";
         String answerPostReplyId = "reply123";
 
         ObjectNode inputData = new ObjectMapper().createObjectNode();
@@ -733,7 +692,7 @@ class AnswerPostReplyServiceImplTest {
         inputData.put(Constants.IS_INITIAL_UPLOAD, false);
 
         // Mock valid token
-        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(accessTokenValidator.verifyUserToken(localToken)).thenReturn(localUserId);
 
         // Mock entity from DB
         ObjectNode dbData = new ObjectMapper().createObjectNode();
@@ -750,11 +709,193 @@ class AnswerPostReplyServiceImplTest {
         when(discussionAnswerPostReplyRepository.findById(answerPostReplyId)).thenReturn(Optional.of(entity));
 
         // Force exception in convertValue
-        ApiResponse response = service.updateAnswerPostReply(inputData, token);
+        ApiResponse response = service.updateAnswerPostReply(inputData, localToken);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getResponseCode());
         assertEquals(Constants.FAILED, response.getParams().getStatus());
         assertEquals(Constants.FAILED_TO_UPDATE_ANSWER_POST, response.getParams().getErrMsg());
     }
+
+    @Test
+    void testUpdateAnswerPostReply_success() {
+        String localToken = "valid.token";
+        String localUserId = "user123";
+        String answerPostReplyId = "reply123";
+
+        ObjectNode inputData = new ObjectMapper().createObjectNode();
+        inputData.put(Constants.ANSWER_POST_REPLY_ID, answerPostReplyId);
+        inputData.put(Constants.IS_INITIAL_UPLOAD, false);
+
+        // Mock valid token
+        when(accessTokenValidator.verifyUserToken(localToken)).thenReturn(localUserId);
+
+        // Mock entity from DB
+        ObjectNode dbData = new ObjectMapper().createObjectNode();
+        dbData.put(Constants.TYPE, Constants.ANSWER_POST_REPLY);
+        dbData.put(Constants.STATUS, Constants.ACTIVE);
+        dbData.put(Constants.PARENT_ANSWER_POST_ID, "parent123");
+        dbData.put(Constants.COMMUNITY_ID, "communityX");
+
+        DiscussionAnswerPostReplyEntity entity = new DiscussionAnswerPostReplyEntity();
+        entity.setIsActive(true);
+        entity.setData(dbData);
+        entity.setDiscussionId("reply123");
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("key", "value");
+
+        // Mock behavior
+        when(objectMapper.createObjectNode()).thenReturn(mockObjectNode);
+        when(mockObjectNode.setAll(any(ObjectNode.class))).thenReturn(mockObjectNode);
+        when(objectMapper.convertValue(mockObjectNode, Map.class))
+                .thenReturn(new HashMap<>(data));
+
+        when(discussionAnswerPostReplyRepository.findById(answerPostReplyId)).thenReturn(Optional.of(entity));
+
+        // Force exception in convertValue
+        ApiResponse response = service.updateAnswerPostReply(inputData, localToken);
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+    }
+
+    @Test
+    void testUpdateAnswerPostReply_withMentionedUsersArray() {
+        String localToken = "valid.token";
+        String localUserId = "user123";
+        String answerPostReplyId = "reply123";
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        // Input data with an ArrayNode for mentioned users
+        ObjectNode inputData = mapper.createObjectNode();
+        inputData.put(Constants.ANSWER_POST_REPLY_ID, answerPostReplyId);
+        inputData.put(Constants.IS_INITIAL_UPLOAD, false);
+
+        ArrayNode mentionedUsersArray = mapper.createArrayNode();
+        ObjectNode user1 = mapper.createObjectNode();
+        user1.put(USER_ID_RQST, "user1");
+        ObjectNode user2 = mapper.createObjectNode();
+        user2.put(USER_ID_RQST, "user2");
+        mentionedUsersArray.add(user1);
+        mentionedUsersArray.add(user2);
+        inputData.set(MENTIONED_USERS, mentionedUsersArray);
+
+        // Mock valid token
+        when(accessTokenValidator.verifyUserToken(localToken)).thenReturn(localUserId);
+
+        // Mock entity from DB with existing mentioned users
+        ObjectNode dbData = mapper.createObjectNode();
+        dbData.put(Constants.TYPE, Constants.ANSWER_POST_REPLY);
+        dbData.put(Constants.STATUS, Constants.ACTIVE);
+        dbData.put(Constants.PARENT_ANSWER_POST_ID, "parent123");
+        dbData.put(Constants.COMMUNITY_ID, "communityX");
+        dbData.set(MENTIONED_USERS, mapper.createArrayNode()); // Add empty mentioned users array
+
+        DiscussionAnswerPostReplyEntity entity = new DiscussionAnswerPostReplyEntity();
+        entity.setIsActive(true);
+        entity.setData(dbData);
+        entity.setDiscussionId(answerPostReplyId);
+
+        // Mock repository
+        when(discussionAnswerPostReplyRepository.findById(answerPostReplyId)).thenReturn(Optional.of(entity));
+        when(discussionAnswerPostReplyRepository.save(any())).thenReturn(entity);
+
+        // Mock ObjectMapper behaviors - critical for mentioned users processing
+        when(objectMapper.createArrayNode()).thenReturn(mapper.createArrayNode());
+        when(objectMapper.createObjectNode()).thenReturn(mapper.createObjectNode());
+        when(objectMapper.convertValue(any(ObjectNode.class), eq(Map.class))).thenReturn(new HashMap<>());
+        
+        // Mock cbServerProperties
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussionEntity");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("jsonPath");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("topic");
+
+        // Act
+        ApiResponse response = service.updateAnswerPostReply(inputData, localToken);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+
+        // Verify that mentioned users array was processed
+        assertTrue(inputData.get(MENTIONED_USERS).isArray());
+        assertEquals(2, inputData.get(MENTIONED_USERS).size()); // user1, user2
+    }
+
+    @Test
+    void testCreateAnswerPostReply_withMentionedUsers_andNotifications() {
+        ObjectMapper mapper = new ObjectMapper();
+
+        // ---- Input Payload ----
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put(Constants.PARENT_ANSWER_POST_ID, parentAnswerPostId);
+        payload.put(Constants.COMMUNITY_ID, communityId);
+        payload.put(Constants.PARENT_DISCUSSION_ID, "parent-discussion");
+
+        // Mentioned users array
+        ArrayNode mentionedUsers = mapper.createArrayNode();
+        ObjectNode user1 = mapper.createObjectNode().put(USER_ID_RQST, "user1");
+        ObjectNode user2 = mapper.createObjectNode().put(USER_ID_RQST, "user2");
+        mentionedUsers.add(user1).add(user2);
+        payload.set(MENTIONED_USERS, mentionedUsers);
+
+        // ---- DiscussionEntity (parent) ----
+        ObjectNode discussionData = mapper.createObjectNode();
+        discussionData.put(Constants.TYPE, Constants.ANSWER_POST);
+        discussionData.put(Constants.STATUS, Constants.ACTIVE);
+        discussionData.put(Constants.COMMUNITY_ID, communityId);
+        discussionData.put(Constants.CREATED_BY, "owner123");
+
+        DiscussionEntity discussionEntity = new DiscussionEntity();
+        discussionEntity.setIsActive(true);
+        discussionEntity.setData(discussionData);
+
+        // ---- Mocks ----
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn("user123"); // user != owner
+        when(discussionRepository.findById(parentAnswerPostId)).thenReturn(Optional.of(discussionEntity));
+        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of(Constants.STATUS, true)));
+        
+        // Critical mocks for mentioned users processing
+        when(objectMapper.createArrayNode()).thenReturn(mapper.createArrayNode());
+        when(objectMapper.createObjectNode()).thenReturn(mapper.createObjectNode());
+        when(objectMapper.convertValue(any(Object.class), eq(Map.class))).thenReturn(new HashMap<>());
+        when(objectMapper.valueToTree(any(Set.class))).thenReturn(mapper.createArrayNode());
+        
+        when(discussionAnswerPostReplyRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(discussionRepository.save(any())).thenReturn(discussionEntity);
+
+        when(cbServerProperties.getDiscussionEntity()).thenReturn("discussion-index");
+        when(cbServerProperties.getElasticDiscussionJsonPath()).thenReturn("elastic-path");
+        when(cbServerProperties.getKafkaProcessDetectLanguageTopic()).thenReturn("test-topic");
+        when(helperMethodService.fetchUserFirstName(anyString())).thenReturn("John");
+
+        // ---- Execute ----
+        ApiResponse response = service.createAnswerPostReply(payload, token);
+
+        // ---- Assertions ----
+        assertEquals(HttpStatus.CREATED, response.getResponseCode());
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+
+        // ---- Verify mentioned users array was replaced with unique cleanArray ----
+        JsonNode cleanedArray = payload.get(MENTIONED_USERS);
+        assertTrue(cleanedArray.isArray());
+        assertEquals(2, cleanedArray.size());
+
+        // ---- Verify notifications ----
+        verify(notificationTriggerService).triggerNotification(
+                eq(REPLIED_COMMENT), eq(ENGAGEMENT), eq(List.of("owner123")),
+                eq(TITLE), eq("John"), anyMap()
+        );
+        verify(notificationTriggerService).triggerNotification(
+                eq(TAGGED_COMMENT), eq(ENGAGEMENT), argThat(list -> list.contains("user1") && list.contains("user2")),
+                eq(TITLE), eq("John"), anyMap()
+        );
+
+        // ---- Verify producer push ----
+        verify(producer).push(eq("test-topic"), any(ObjectNode.class));
+    }
+
 }
 

@@ -2,6 +2,7 @@ package com.igot.cb.discussion.service;
 
 import java.util.Map;
 
+import com.igot.cb.discussion.entity.DiscussionEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -43,4 +44,12 @@ public interface DiscussionService {
     ApiResponse getEnrichedDiscussionData(Map<String, Object> data, String token);
 
     ApiResponse getGlobalFeed(SearchCriteria searchCriteria, String token, boolean isOverride);
+
+    void deleteCacheByCommunity(String communityId);
+
+    void updateCacheForFirstFivePages(String communityId, boolean b);
+
+    SearchCriteria createSearchCriteriaWithDefaults(String parentDiscussionId, String communityId, String type);
+
+    void updateAnswerPostToDiscussion(DiscussionEntity discussionEntity, String discussionId, String action);
 }
