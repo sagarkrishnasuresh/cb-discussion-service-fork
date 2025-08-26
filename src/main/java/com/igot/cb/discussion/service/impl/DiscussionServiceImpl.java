@@ -38,6 +38,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.cloud.storage.BaseStorageService;
 import org.sunbird.cloud.storage.factory.StorageConfig;
@@ -961,17 +962,20 @@ public class DiscussionServiceImpl implements DiscussionService {
                 String createdBy = answerPostData.get(CREATED_BY).asText();
                 String firstName = helperMethodService.fetchUserFirstName(createdBy);
                 log.info("Notification trigger started for create answerPost");
-                if (!userId.equals(discussionOwner)) {
-                    notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
+                if (mentionedUsersNode == null || mentionedUsersNode.isEmpty()) {
+                    if (!userId.equals(discussionOwner)) {
+                        notificationTriggerService.triggerNotification(LIKED_COMMENT, ENGAGEMENT, List.of(discussionOwner), TITLE, firstName, notificationData);
+                    }
                 }
-                if (CollectionUtils.isNotEmpty(userIdList)) {
+                else if (CollectionUtils.isNotEmpty(userIdList)) {
                     List<String> filteredUserIdList = userIdList.stream()
-                            .filter(uniqueId -> !uniqueId.equals(discussionOwner)).toList();
+                            .filter(uniqueId -> !uniqueId.equals(userId))
+                            .toList();
 
                     if (CollectionUtils.isNotEmpty(filteredUserIdList)) {
                         Map<String, Object> answerPostNotificationData = Map.of(
                                 Constants.COMMUNITY_ID, answerPostData.get(Constants.COMMUNITY_ID).asText(),
-                                Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
+                                Constants.DISCUSSION_ID, answerPostData.get(Constants.PARENT_DISCUSSION_ID).asText()
                         );
                         notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, filteredUserIdList, TITLE, firstName, answerPostNotificationData);
                     }
@@ -1416,7 +1420,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
                     Map<String, Object> notificationData = Map.of(
                             Constants.COMMUNITY_ID, data.get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID, discussionEntity.getDiscussionId()
+                            Constants.DISCUSSION_ID, data.get(Constants.PARENT_DISCUSSION_ID).asText()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
                     notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, newlyAddedUserIds, TITLE, firstName, notificationData);

@@ -189,11 +189,12 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                 }
                 if (CollectionUtils.isNotEmpty(userIdList)) {
                     List<String> filteredUserIdList = userIdList.stream()
-                            .filter(uniqueId -> !uniqueId.equals(discussionOwner)).toList();
+                            .filter(uniqueId -> !uniqueId.equals(userId))
+                            .toList();
                     if (CollectionUtils.isNotEmpty(filteredUserIdList)) {
                         Map<String, Object> replyNotificationData = Map.of(
                                 Constants.COMMUNITY_ID, answerPostReplyDataNode.get(Constants.COMMUNITY_ID).asText(),
-                                Constants.DISCUSSION_ID, jsonNodeEntity.getDiscussionId()
+                                Constants.DISCUSSION_ID, answerPostReplyDataNode.get(Constants.PARENT_DISCUSSION_ID).asText()
                         );
 
                         notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, filteredUserIdList, TITLE, firstName, replyNotificationData);
@@ -445,7 +446,7 @@ public class AnswerPostReplyServiceImpl implements AnswerPostReplyService {
                 if (CollectionUtils.isNotEmpty(newlyAddedUserIds)) {
                     Map<String, Object> notificationData = Map.of(
                             Constants.COMMUNITY_ID, data.get(Constants.COMMUNITY_ID).asText(),
-                            Constants.DISCUSSION_ID, discussionAnswerPostReplyEntity.getDiscussionId()
+                            Constants.DISCUSSION_ID, data.get(Constants.PARENT_DISCUSSION_ID).asText()
                     );
                     String firstName = helperMethodService.fetchUserFirstName(userId);
                     notificationTriggerService.triggerNotification(TAGGED_COMMENT, ENGAGEMENT, newlyAddedUserIds, TITLE, firstName, notificationData);

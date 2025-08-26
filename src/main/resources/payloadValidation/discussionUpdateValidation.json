@@ -3,17 +3,20 @@
   "type": "object",
   "properties": {
     "discussionId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "communityId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "type": {
       "type": "string",
       "enum": ["question"]
     },
     "description": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "isInitialUpload": {
       "type": "boolean"
