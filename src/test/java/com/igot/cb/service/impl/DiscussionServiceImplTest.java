@@ -3715,21 +3715,16 @@ class DiscussionServiceImplTest {
 
         // Verify notifications were triggered
         verify(notificationTriggerService).triggerNotification(
-                eq(LIKED_COMMENT),
-                eq(ENGAGEMENT),
-                eq(List.of(discussionOwner)),
-                eq(TITLE),
-                eq("John"),
-                anyMap()
-        );
-        verify(notificationTriggerService).triggerNotification(
-                eq(TAGGED_COMMENT),
-                eq(ENGAGEMENT),
+                eq(Constants.TAGGED_COMMENT),
+                eq(Constants.ENGAGEMENT),
                 argThat(list -> list.contains("user-999") && list.contains("user-888")),
-                eq(TITLE),
+                eq(Constants.TITLE),
                 eq("John"),
                 anyMap()
         );
+
+        // Ensure no extra unwanted calls
+        verifyNoMoreInteractions(notificationTriggerService);
     }
 
 }
